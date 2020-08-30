@@ -724,20 +724,20 @@ def post_reserve():
                     # 曖昧予約席とその他の候補席を選出
                     seatnum = adult + child - 1  # 予約する座席の合計数 全体の人数からあいまい指定席分を引いておく
                     reserved = False  # あいまい指定席確保済フラグ
-                    vargue = True  # あいまい検索フラグ
+                    vague = True  # あいまい検索フラグ
                     vague_seat = None  # あいまい指定席保存用
 
                     if not column:  # A/B/C/D/Eを指定しなければ、空いている適当な指定席を取るあいまいモード
                         seatnum = adult + child
                         reserved = True
-                        vargue = False
+                        vague = False
 
                     candidate_seat_list = []
 
                     i = 0
                     for seat in seat_information_list:
-                        if seat["column"] == column and not seat["is_occupied"] and not reserved and vargue:  # あいまい席があいてる
-                            vargue_seat = {
+                        if seat["column"] == column and not seat["is_occupied"] and not reserved and vague:  # あいまい席があいてる
+                            vague_seat = {
                                 "row":    seat["row"],
                                 "column": seat["column"],
                             }
@@ -749,7 +749,7 @@ def post_reserve():
                             })
                             i += 1
 
-                    if vargue and reserved:  # あいまい席が見つかり、予約できそうだった
+                    if vague and reserved:  # あいまい席が見つかり、予約できそうだった
                         seats.append(vague_seat)
                     if i > 0:  # 候補席があった
                         seats += candidate_seat_list

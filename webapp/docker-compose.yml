@@ -12,7 +12,7 @@ services:
       - "5000:5000"
     links:
       - "webapp"
-      - "payment"
+#      - "payment"
 
   mysql:
     image: mysql:8
@@ -29,19 +29,19 @@ services:
     ports:
       - "13306:3306"
 
-  payment:
-    image: golang:1.12
-    volumes:
-      - ../blackbox/payment:/go/src/payment
-    environment:
-      - "GO111MODULE=on"
-    command:
-      - go
-      - run
-      - main.go
-    working_dir: /go/src/payment
-    env_file:
-      - ".env"
+#  payment:
+#    image: golang:1.12
+#    volumes:
+#      - ../blackbox/payment:/go/src/payment
+#    environment:
+#      - "GO111MODULE=on"
+#    command:
+#      - go
+#      - run
+#      - main.go
+#    working_dir: /go/src/payment
+#    env_file:
+#      - ".env"
 
   # development only
   phpmyadmin:

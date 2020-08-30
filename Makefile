@@ -16,3 +16,11 @@ payment:
 
 bench:
 	cd bench && make && cp -av bin/bench_linux ../ansible/roles/benchmark/files/bench && cp -av bin/benchworker_linux ../ansible/roles/benchmark/files/benchworker
+
+
+
+LANGUAGE:=python
+build:
+	docker-compose -f webapp/docker-compose.yml -f webapp/docker-compose.$(LANGUAGE).yml build
+run:
+	docker-compose -f webapp/docker-compose.yml -f webapp/docker-compose.$(LANGUAGE).yml up

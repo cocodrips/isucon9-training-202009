@@ -213,7 +213,7 @@ def make_reservation_response(c, reservation):
     ))
     arrival = c.fetchone()
 
-    ret = filter_dict_keys(reservation, ("reservation_id", "date", "amount", "adult", "child", "departure", "arrival", "train_class", "train_name"))
+    reservation = filter_dict_keys(reservation, ("reservation_id", "date", "amount", "adult", "child", "departure", "arrival", "train_class", "train_name"))
     reservation["departure_time"] = str(departure["departure"])
     reservation["arrival_time"] = str(arrival["arrival"])
 

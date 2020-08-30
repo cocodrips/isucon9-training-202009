@@ -22,6 +22,7 @@ bench:
 LANGUAGE:=python
 build:
 	docker-compose -f webapp/docker-compose.local.yml -f webapp/docker-compose.$(LANGUAGE).yml build
-run-local:
-#	docker rm -f webapp_webapp_1 documents_db_1
+run-local: build
 	docker-compose -f webapp/docker-compose.local.yml -f webapp/docker-compose.$(LANGUAGE).yml up
+remove:
+	docker-compose -f webapp/docker-compose.local.yml -f webapp/docker-compose.$(LANGUAGE).yml rm

@@ -78,6 +78,8 @@ CREATE TABLE `train_timetable_master` (
   `departure` time NOT NULL,
   `arrival` time NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+create index train_timetable_master_date_train_class_train_name_station_index
+   on train_timetable_master (date, train_class, train_name, station);
 
 DROP TABLE IF EXISTS `users`;
 CREATE TABLE `users` (
@@ -86,3 +88,4 @@ CREATE TABLE `users` (
   `salt` varbinary(1024) NOT NULL,
   `super_secure_password` varbinary(256) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+

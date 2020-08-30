@@ -63,8 +63,7 @@ def get_user():
                 raise HttpException(requests.codes['unauthorized'], "user not found")
     except MySQLdb.Error as err:
         app.logger.exception(err)
-        # todo: What's this http_json_error ?
-        http_json_error(requests.codes['internal_server_error'], "db error")
+        raise HttpException(requests.codes['internal_server_error'], "db error")
     return user
 
 

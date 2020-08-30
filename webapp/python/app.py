@@ -872,11 +872,10 @@ def post_reserve():
             reservation_id = c.lastrowid
 
             # 席の予約情報登録
-            # reservationsレコード1に対してseat_reservationstが1以上登録される
+            # reservationsレコード1に対してseat_reservationsが1以上登録される
             sql = "INSERT INTO `seat_reservations` (`reservation_id`, `car_number`, `seat_row`, `seat_column`) VALUES (%s, %s, %s, %s)"
             for seat in seats:
                 c.execute(sql, (reservation_id, car_number, seat["row"], seat["column"]))
-
 
     except MySQLdb.Error as err:
         conn.rollback()

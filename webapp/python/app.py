@@ -63,7 +63,7 @@ def get_user():
                 raise HttpException(requests.codes['unauthorized'], "user not found")
     except MySQLdb.Error as err:
         app.logger.exception(err)
-        http_json_error(requests.codes['internal_server_error'], "db error")
+        raise HttpException(requests.codes['internal_server_error'], "db error")
     return user
 
 
@@ -212,7 +212,7 @@ def make_reservation_response(c, reservation):
     ))
     arrival = c.fetchone()
 
-    ret = filter_dict_keys(reservation, ("reservation_id", "date", "amount", "adult", "child", "departure", "arrival", "train_class", "train_name"))
+    reservation = filter_dict_keys(reservation, ("reservation_id", "date", "amount", "adult", "child", "departure", "arrival", "train_class", "train_name"))
     reservation["departure_time"] = str(departure["departure"])
     reservation["arrival_time"] = str(arrival["arrival"])
 
@@ -321,8 +321,6 @@ def get_train_search():
             else:
                 sql = "SELECT * FROM train_master WHERE date=%s AND is_nobori=%s AND train_class=%s"
                 c.execute(sql, (str(use_at.date()), is_nobori, train_class))
-
-            train_search_response_list = []
 
             train_list = c.fetchall()
 
@@ -535,8 +533,8 @@ def get_train_seats():
                     )
                 )
 
-                seat_roweservation_list = c.fetchall()
-                for seat_roweservation in seat_roweservation_list:
+                seat_reservation_list = c.fetchall()
+                for seat_reservation in seat_reservation_list:
                     sql = "SELECT * FROM reservations WHERE reservation_id=%s"
                     c.execute(sql, (seat_reservation["reservation_id"],))
                     reservation = c.fetchone()
@@ -725,20 +723,20 @@ def post_reserve():
                     # 曖昧予約席とその他の候補席を選出
                     seatnum = adult + child - 1  # 予約する座席の合計数 全体の人数からあいまい指定席分を引いておく
                     reserved = False  # あいまい指定席確保済フラグ
-                    vargue = True  # あいまい検索フラグ
+                    vague = True  # あいまい検索フラグ
                     vague_seat = None  # あいまい指定席保存用
 
                     if not column:  # A/B/C/D/Eを指定しなければ、空いている適当な指定席を取るあいまいモード
                         seatnum = adult + child
                         reserved = True
-                        vargue = False
+                        vague = False
 
                     candidate_seat_list = []
 
                     i = 0
                     for seat in seat_information_list:
-                        if seat["column"] == column and not seat["is_occupied"] and not reserved and vargue:  # あいまい席があいてる
-                            vargue_seat = {
+                        if seat["column"] == column and not seat["is_occupied"] and not reserved and vague:  # あいまい席があいてる
+                            vague_seat = {
                                 "row":    seat["row"],
                                 "column": seat["column"],
                             }
@@ -750,7 +748,7 @@ def post_reserve():
                             })
                             i += 1
 
-                    if vargue and reserved:  # あいまい席が見つかり、予約できそうだった
+                    if vague and reserved:  # あいまい席が見つかり、予約できそうだった
                         seats.append(vague_seat)
                     if i > 0:  # 候補席があった
                         seats += candidate_seat_list
@@ -839,7 +837,7 @@ def post_reserve():
                 car_number = 0
                 seats = []
                 for num in range(adult, child):
-                    seats.appaned({
+                    seats.append({
                         "raw":    0,
                         "column": "",
                     })
@@ -873,11 +871,10 @@ def post_reserve():
             reservation_id = c.lastrowid
 
             # 席の予約情報登録
-            # reservationsレコード1に対してseat_reservationstが1以上登録される
+            # reservationsレコード1に対してseat_reservationsが1以上登録される
             sql = "INSERT INTO `seat_reservations` (`reservation_id`, `car_number`, `seat_row`, `seat_column`) VALUES (%s, %s, %s, %s)"
             for seat in seats:
                 c.execute(sql, (reservation_id, car_number, seat["row"], seat["column"]))
-
 
     except MySQLdb.Error as err:
         conn.rollback()

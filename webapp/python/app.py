@@ -22,6 +22,8 @@ SessionName = "session_isutrain"
 
 TrainClassMap = {"express": "最速", "semi_express": "中間", "local": "遅いやつ"}
 
+# On memory
+station_master = {}
 
 class HttpException(Exception):
     status_code = 500
@@ -51,6 +53,14 @@ def dbh():
         )
     return flask.g.db
 
+
+def load_station():
+    conn = dbh()
+    with conn.cursor() as c:
+        sql = "SELECT * FROM station_master"
+        c.execute(sql)
+        for row in c.fetchall():
+            station_master[row['name']] = row
 
 def get_user():
     user_id = flask.session.get("user_id")
@@ -292,16 +302,21 @@ def get_train_search():
     try:
         conn = dbh()
         with conn.cursor() as c:
-            sql = "SELECT * FROM station_master WHERE name=%s"
-            c.execute(sql, (from_name,))
-            from_station = c.fetchone()
-            if not from_station:
-                raise HttpException(requests.codes['bad_request'], "fromStation: no rows")
+            from_station = station_master.get(from_name)
+            to_station = station_master.get(to_name)
 
-            c.execute(sql, (to_name,))
-            to_station = c.fetchone()
+            sql = "SELECT * FROM station_master WHERE name=%s"
+            if not from_station:
+                c.execute(sql, (from_name,))
+                from_station = c.fetchone()
+                if not from_station:
+                    raise HttpException(requests.codes['bad_request'], "fromStation: no rows")
+
             if not to_station:
-                raise HttpException(requests.codes['bad_request'], "toStation: no rows")
+                c.execute(sql, (to_name,))
+                to_station = c.fetchone()
+                if not to_station:
+                    raise HttpException(requests.codes['bad_request'], "toStation: no rows")
 
             is_nobori = False
             if from_station["distance"] > to_station["distance"]:
@@ -1118,6 +1133,7 @@ def post_initialize():
         c.execute("TRUNCATE reservations")
         c.execute("TRUNCATE users")
 
+    load_station()
     return flask.jsonify({
         "language":       "python",  # 実装言語を返す
         "available_days": AvailableDays,

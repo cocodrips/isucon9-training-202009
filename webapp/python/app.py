@@ -121,16 +121,31 @@ def get_usable_train_class_list(from_station, to_station):
     return list(usable)
 
 
-def get_available_seats_from_train(c, train, from_station, to_station, seat_class, is_smoking_seat):
-    available_set_map = {}
+def get_available_seats_from_train(c, train, from_station, to_station):
+    availables = {
+        'premium': {
+            False: {},
+            True: {}
+        },
+        'reserved': {
+            False: {},
+            True: {}
+        }
+    }
 
     try:
-        sql = "SELECT * FROM seat_master WHERE train_class=%s AND seat_class=%s AND is_smoking_seat=%s"
+        # sql = "SELECT * FROM seat_master WHERE train_class=%s AND seat_class=%s AND is_smoking_seat=%s"
+        sql = "SELECT * FROM seat_master WHERE train_class=%s"
 
-        c.execute(sql, (train["train_class"], seat_class, is_smoking_seat))
+        c.execute(sql, (train["train_class"], ))
         seat_list = c.fetchall()
 
+        app.logger.debug(seat_list)
+
         for seat in seat_list:
+            if seat['seat_class'] == 'non-reserved':
+                continue
+            available_set_map = availables[seat['seat_class']][seat['is_smoking_seat']]
             available_set_map["{}_{}_{}".format(seat["car_number"], seat["seat_row"], seat["seat_column"])] = seat
 
         sql = """SELECT sr.reservation_id, sr.car_number, sr.seat_row, sr.seat_column
@@ -153,8 +168,11 @@ def get_available_seats_from_train(c, train, from_station, to_station, seat_clas
         c.execute(sql, (from_station["id"], from_station["id"], to_station["id"], to_station["id"], from_station["id"], to_station["id"]))
         seat_reservation_list = c.fetchall()
 
-        for seat_reservation in seat_reservation_list:
-            key = "{}_{}_{}".format(seat_reservation["car_number"], seat_reservation["seat_row"], seat_reservation["seat_column"])
+        for seat in seat_reservation_list:
+            if seat['seat_class'] == 'non-reserved':
+                continue
+            available_set_map =  availables[seat['seat_class']][seat['is_smoking_seat']]
+            key = "{}_{}_{}".format(seat["car_number"], seat["seat_row"], seat["seat_column"])
             if key in available_set_map:
                 del (available_set_map[key])
 
@@ -162,7 +180,7 @@ def get_available_seats_from_train(c, train, from_station, to_station, seat_clas
         app.logger.exception(err)
         raise HttpException(requests.codes['internal_server_error'], "db error")
 
-    return available_set_map.values()
+    return availables['premium'][False].values(), availables['premium'][True].values(), availables['reserved'][False].values(), availables['reserved'][True].values()
 
 
 def get_distance_fare(c, distance):
@@ -307,18 +325,21 @@ def get_train_search():
             from_station = station_master.get(from_name)
             to_station = station_master.get(to_name)
 
+            app.logger.debug(f'{from_station["name"]} -----> {to_station["name"]}')
+
             is_nobori = False
             if from_station["distance"] > to_station["distance"]:
                 is_nobori = True
 
             usable_train_class_list = get_usable_train_class_list(from_station, to_station)
-            app.logger.warn("{}".format(usable_train_class_list))
+            # app.logger.warnning("{}".format(usable_train_class_list))
 
             if is_nobori:
                 station_list = list(station_master.values())[::-1]
             else:
                 station_list = list(station_master.values())
-            app.logger.info(is_nobori, station_list)
+            app.logger.debug(f"{is_nobori}, {[(s['name'], s['distance']) for s in station_list]}")
+            # app.logger.info(f"{is_nobori}, {station_list}")
 
 
             if not train_class:
@@ -360,8 +381,7 @@ def get_train_search():
                             isContainsDestStation = True
                             break
                         else:
-                            # 出発駅より先に終点が見つかったとき
-                            app.logger.error("Found to_station before from_station")
+                            # 出発駅より先に終点が見つかったときは対象外
                             break
 
                     if station["name"] == train["last_station"]:
@@ -386,10 +406,13 @@ def get_train_search():
                         # 乗りたい時刻より出発時刻が前なので除外
                         continue
 
-                    premium_avail_seats = get_available_seats_from_train(c, train, from_station, to_station, "premium", False)
-                    premium_smoke_avail_seats = get_available_seats_from_train(c, train, from_station, to_station, "premium", True)
-                    reserved_avail_seats = get_available_seats_from_train(c, train, from_station, to_station, "reserved", False)
-                    reserved_smoke_avail_seats = get_available_seats_from_train(c, train, from_station, to_station, "reserved", True)
+                    (premium_avail_seats, premium_smoke_avail_seats,
+                     reserved_avail_seats, reserved_smoke_avail_seats) = get_available_seats_from_train(c, train, from_station, to_station)
+
+                    # premium_avail_seats = get_available_seats_from_train(c, train, from_station, to_station, "premium", False)
+                    # premium_smoke_avail_seats = get_available_seats_from_train(c, train, from_station, to_station, "premium", True)
+                    # reserved_avail_seats = get_available_seats_from_train(c, train, from_station, to_station, "reserved", False)
+                    # reserved_smoke_avail_seats = get_available_seats_from_train(c, train, from_station, to_station, "reserved", True)
 
                     premium_avail = "○"
                     if len(premium_avail_seats) == 0:

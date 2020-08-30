@@ -25,6 +25,7 @@ TrainClassMap = {"express": "最速", "semi_express": "中間", "local": "遅い
 # On memory
 station_master = {}
 
+
 class HttpException(Exception):
     status_code = 500
 
@@ -173,7 +174,6 @@ def get_distance_fare(c, distance):
     lastDistance = 0.0
     lastFare = 0
     for distanceFare in distance_fare_list:
-        app.logger.warn("{} {} {}".format(distance, distanceFare["distance"], distanceFare["fare"]))
         if lastDistance < distance and distance < distanceFare["distance"]:
             break
         lastDistance = distanceFare["distance"]
@@ -302,21 +302,10 @@ def get_train_search():
     try:
         conn = dbh()
         with conn.cursor() as c:
+            if not station_master:
+                load_station()
             from_station = station_master.get(from_name)
             to_station = station_master.get(to_name)
-
-            sql = "SELECT * FROM station_master WHERE name=%s"
-            if not from_station:
-                c.execute(sql, (from_name,))
-                from_station = c.fetchone()
-                if not from_station:
-                    raise HttpException(requests.codes['bad_request'], "fromStation: no rows")
-
-            if not to_station:
-                c.execute(sql, (to_name,))
-                to_station = c.fetchone()
-                if not to_station:
-                    raise HttpException(requests.codes['bad_request'], "toStation: no rows")
 
             is_nobori = False
             if from_station["distance"] > to_station["distance"]:
@@ -325,13 +314,12 @@ def get_train_search():
             usable_train_class_list = get_usable_train_class_list(from_station, to_station)
             app.logger.warn("{}".format(usable_train_class_list))
 
-            sql = "SELECT * FROM station_master ORDER BY distance"
             if is_nobori:
-                # 上りだったら駅リストを逆にする
-                sql += " DESC"
+                station_list = list(station_master.values())[::-1]
+            else:
+                station_list = list(station_master.values())
+            app.logger.info(is_nobori, station_list)
 
-            c.execute(sql)
-            station_list = c.fetchall()
 
             if not train_class:
                 sql = "SELECT * FROM train_master WHERE date=%s AND is_nobori=%s"
@@ -373,7 +361,7 @@ def get_train_search():
                             break
                         else:
                             # 出発駅より先に終点が見つかったとき
-                            app.logger.warn("なんかおかしい")
+                            app.logger.error("Found to_station before from_station")
                             break
 
                     if station["name"] == train["last_station"]:
@@ -1140,6 +1128,9 @@ def post_initialize():
     })
 
 
+
+# Load first
+
 if __name__ == "__main__":
     app.logger.setLevel(logging.DEBUG)
-    app.run(port=8000, debug=True, threaded=True)
+    app.run(port=8001, debug=True, threaded=True)

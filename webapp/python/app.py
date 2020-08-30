@@ -15,7 +15,7 @@ app = flask.Flask(__name__)
 app.config['SECRET_KEY'] = 'isutrain'
 
 AvailableDays = 10
-SessionName   = "session_isutrain"
+SessionName = "session_isutrain"
 
 TrainClassMap = {"express": "最速", "semi_express": "中間", "local": "遅いやつ"}
 
@@ -32,7 +32,6 @@ class HttpException(Exception):
         response = flask.jsonify({'is_error': True, 'message': self.message})
         response.status_code = self.status_code
         return response
-
 
 
 def dbh():
@@ -75,12 +74,15 @@ def filter_dict_keys(d, allowed_keys):
             ret[k] = v
     return ret
 
+
 @app.errorhandler(HttpException)
 def handle_http_exception(error):
     return error.get_response()
 
+
 def message_response(message):
     return flask.jsonify({'is_error': False, 'message': message})
+
 
 def check_available_date(date):
     d = datetime.datetime(2020, 1, 1) + datetime.timedelta(days=AvailableDays)
@@ -90,7 +92,6 @@ def check_available_date(date):
 
 
 def get_usable_train_class_list(from_station, to_station):
-
     usable = list(TrainClassMap.values())
 
     for station in (from_station, to_station):
@@ -107,7 +108,6 @@ def get_usable_train_class_list(from_station, to_station):
 
 
 def get_available_seats_from_train(c, train, from_station, to_station, seat_class, is_smoking_seat):
-
     available_set_map = {}
 
     try:
@@ -142,16 +142,16 @@ def get_available_seats_from_train(c, train, from_station, to_station, seat_clas
         for seat_reservation in seat_reservation_list:
             key = "{}_{}_{}".format(seat_reservation["car_number"], seat_reservation["seat_row"], seat_reservation["seat_column"])
             if key in available_set_map:
-                del(available_set_map[key])
+                del (available_set_map[key])
 
     except MySQLdb.Error as err:
         app.logger.exception(err)
         raise HttpException(requests.codes['internal_server_error'], "db error")
 
-    return  available_set_map.values()
+    return available_set_map.values()
+
 
 def get_distance_fare(c, distance):
-
     sql = "SELECT distance,fare FROM distance_fare_master ORDER BY distance"
     c.execute(sql)
 
@@ -161,15 +161,15 @@ def get_distance_fare(c, distance):
     lastFare = 0
     for distanceFare in distance_fare_list:
         app.logger.warn("{} {} {}".format(distance, distanceFare["distance"], distanceFare["fare"]))
-        if  lastDistance < distance and distance < distanceFare["distance"]:
+        if lastDistance < distance and distance < distanceFare["distance"]:
             break
         lastDistance = distanceFare["distance"]
         lastFare = distanceFare["fare"]
 
     return lastFare
 
-def calc_fare(c, date, from_station, to_station, train_class, seat_class):
 
+def calc_fare(c, date, from_station, to_station, train_class, seat_class):
     distance = abs(to_station["distance"] - from_station["distance"])
     distFare = get_distance_fare(c, distance)
 
@@ -212,7 +212,7 @@ def make_reservation_response(c, reservation):
     ))
     arrival = c.fetchone()
 
-    ret = filter_dict_keys(reservation,("reservation_id", "date", "amount", "adult", "child", "departure", "arrival", "train_class", "train_name"))
+    ret = filter_dict_keys(reservation, ("reservation_id", "date", "amount", "adult", "child", "departure", "arrival", "train_class", "train_name"))
     reservation["departure_time"] = str(departure["departure"])
     reservation["arrival_time"] = str(arrival["arrival"])
 
@@ -231,11 +231,10 @@ def make_reservation_response(c, reservation):
         seat = c.fetchone()
         reservation["seat_class"] = seat["seat_class"]
 
-
     reservation["seats"] = []
     for seat in seat_reservation_list:
         reservation["seats"].append({
-            "seat_row": seat["seat_row"],
+            "seat_row":    seat["seat_row"],
             "seat_column": seat["seat_column"],
         })
 
@@ -244,7 +243,6 @@ def make_reservation_response(c, reservation):
 
 @app.route("/api/stations", methods=["GET"])
 def get_stations():
-
     station_list = []
 
     try:
@@ -274,7 +272,6 @@ def get_stations():
 
 @app.route("/api/train/search", methods=["GET"])
 def get_train_search():
-
     use_at = dateutil.parser.parse(flask.request.args.get('use_at')).astimezone(JST)
 
     train_class = flask.request.args.get('train_class')
@@ -293,17 +290,15 @@ def get_train_search():
         conn = dbh()
         with conn.cursor() as c:
             sql = "SELECT * FROM station_master WHERE name=%s"
-            c.execute(sql, (from_name, ))
+            c.execute(sql, (from_name,))
             from_station = c.fetchone()
             if not from_station:
                 raise HttpException(requests.codes['bad_request'], "fromStation: no rows")
 
-
-            c.execute(sql, (to_name, ))
+            c.execute(sql, (to_name,))
             to_station = c.fetchone()
             if not to_station:
                 raise HttpException(requests.codes['bad_request'], "toStation: no rows")
-
 
             is_nobori = False
             if from_station["distance"] > to_station["distance"]:
@@ -355,7 +350,6 @@ def get_train_search():
                         # 発駅を経路中に持つ編成の場合フラグを立てる
                         isContainsOriginStation = True
 
-
                     if station["id"] == to_station["id"]:
                         if isContainsOriginStation:
                             # 発駅と着駅を経路中に持つ編成の場合
@@ -369,7 +363,7 @@ def get_train_search():
                     if station["name"] == train["last_station"]:
                         # 駅が見つからないまま当該編成の終点に着いてしまったとき
                         break
-                    i+=1
+                    i += 1
 
                 if isContainsOriginStation and isContainsDestStation:
                     # 列車情報
@@ -383,7 +377,6 @@ def get_train_search():
                     c.execute(sql, (str(use_at.date()), train["train_class"], train["train_name"], to_station["name"]))
                     arrival = c.fetchone()
                     arrival = datetime.datetime(use_at.year, use_at.month, use_at.day, 0, 0, 0).replace(tzinfo=JST) + arrival["arrival"]
-
 
                     if use_at > departure:
                         # 乗りたい時刻より出発時刻が前なので除外
@@ -420,23 +413,22 @@ def get_train_search():
 
                     # 空席情報
                     seatAvailability = {
-                        "premium": premium_avail,
-                        "premium_smoke": premium_smoke_avail,
-                        "reserved": reserved_avail,
+                        "premium":        premium_avail,
+                        "premium_smoke":  premium_smoke_avail,
+                        "reserved":       reserved_avail,
                         "reserved_smoke": reserved_smoke_avail,
-                        "non_reserved": "○",
+                        "non_reserved":   "○",
                     }
 
                     # 料金計算
                     premiumFare = calc_fare(c, use_at.date(), from_station, to_station, train["train_class"], "premium")
-                    premiumFare = int(premiumFare*adult) + int(premiumFare/2*child)
+                    premiumFare = int(premiumFare * adult) + int(premiumFare / 2 * child)
 
                     reservedFare = calc_fare(c, use_at.date(), from_station, to_station, train["train_class"], "reserved")
-                    reservedFare = int(reservedFare*adult) + int(reservedFare/2*child)
+                    reservedFare = int(reservedFare * adult) + int(reservedFare / 2 * child)
 
                     nonReservedFare = calc_fare(c, use_at.date(), from_station, to_station, train["train_class"], "non-reserved")
-                    nonReservedFare = int(nonReservedFare*adult) + int(nonReservedFare/2*child)
-
+                    nonReservedFare = int(nonReservedFare * adult) + int(nonReservedFare / 2 * child)
 
                     fareInformation = {
                         "premium":        premiumFare,
@@ -447,26 +439,23 @@ def get_train_search():
                     }
 
                     trainSearchResponseList.append({
-                        "train_class": train["train_class"],
-                        "train_name": train["train_name"],
-                        "start": train["start_station"],
-                        "last": train["last_station"],
-                        "departure": from_station["name"],
-                        "arrival": to_station["name"],
-                        "departure_time": str(departure.time()),
-                        "arrival_time": str(arrival.time()),
+                        "train_class":       train["train_class"],
+                        "train_name":        train["train_name"],
+                        "start":             train["start_station"],
+                        "last":              train["last_station"],
+                        "departure":         from_station["name"],
+                        "arrival":           to_station["name"],
+                        "departure_time":    str(departure.time()),
+                        "arrival_time":      str(arrival.time()),
                         "seat_availability": seatAvailability,
-                        "seat_fare": fareInformation,
+                        "seat_fare":         fareInformation,
                     })
 
                     if len(trainSearchResponseList) >= 10:
                         break
-
-
     except MySQLdb.Error as err:
         app.logger.exception(err)
         raise HttpException(requests.codes['internal_server_error'], "db error")
-
 
     return flask.jsonify(trainSearchResponseList)
 
@@ -485,7 +474,6 @@ def get_train_seats():
     if not check_available_date(date):
         raise HttpException(requests.codes['not_found'], "予約可能期間外です")
 
-
     seat_information_list = []
     car_list = []
 
@@ -498,15 +486,13 @@ def get_train_seats():
             if not train:
                 raise HttpException(requests.codes['not_found'], "列車が存在しません")
 
-
             sql = "SELECT * FROM station_master WHERE name=%s"
-            c.execute(sql, (from_name, ))
+            c.execute(sql, (from_name,))
             from_station = c.fetchone()
             if not from_station:
                 raise HttpException(requests.codes['bad_request'], "fromStation: no rows")
 
-
-            c.execute(sql, (to_name, ))
+            c.execute(sql, (to_name,))
             to_station = c.fetchone()
             if not to_station:
                 raise HttpException(requests.codes['bad_request'], "toStation: no rows")
@@ -523,11 +509,11 @@ def get_train_seats():
 
             for seat in seat_list:
                 seat = {
-                    "row": seat["seat_row"],
-                    "column": seat["seat_column"],
-                    "class": seat["seat_class"],
+                    "row":             seat["seat_row"],
+                    "column":          seat["seat_column"],
+                    "class":           seat["seat_class"],
                     "is_smoking_seat": True if seat["is_smoking_seat"] else False,
-                    "is_occupied": False,
+                    "is_occupied":     False,
                 }
 
                 sql = """
@@ -555,7 +541,7 @@ def get_train_seats():
                     c.execute(sql, (seat_reservation["reservation_id"],))
                     reservation = c.fetchone()
 
-                    sql  = "SELECT * FROM station_master WHERE name=%s"
+                    sql = "SELECT * FROM station_master WHERE name=%s"
                     c.execute(sql, (reservation["departure"],))
                     departure_station = c.fetchone()
                     c.execute(sql, (reservation["arrival"],))
@@ -578,7 +564,6 @@ def get_train_seats():
 
                 seat_information_list.append(seat)
 
-
             # 各号車の情報
             i = 1
             while True:
@@ -593,21 +578,21 @@ def get_train_seats():
                     "seat_class": seat["seat_class"],
                 })
 
-                i+=1
+                i += 1
 
     except MySQLdb.Error as err:
         app.logger.exception(err)
         raise HttpException(requests.codes['internal_server_error'], "db error")
 
-
     return flask.jsonify({
-        "date": str(date).replace("-", "/"),
+        "date":        str(date).replace("-", "/"),
         "train_class": train_class,
-        "train_name": train_name,
-        "car_number": car_number,
-        "seats": seat_information_list,
-        "cars":car_list
+        "train_name":  train_name,
+        "car_number":  car_number,
+        "seats":       seat_information_list,
+        "cars":        car_list
     })
+
 
 @app.route("/api/train/reserve", methods=["POST"])
 def post_reserve():
@@ -629,14 +614,12 @@ def post_reserve():
     child = int(body.get('child'))
 
     column = body.get('column')
-    seats =  body.get('seats', [])
+    seats = body.get('seats', [])
 
     if not check_available_date(date):
         raise HttpException(requests.codes['not_found'], "予約可能期間外です")
 
-
     seat_information_list = []
-
 
     try:
         conn = dbh()
@@ -648,25 +631,23 @@ def post_reserve():
             if not train:
                 raise HttpException(requests.codes['not_found'], "列車が存在しません")
 
-
             sql = "SELECT * FROM station_master WHERE name=%s"
-            c.execute(sql, (train["start_station"], ))
+            c.execute(sql, (train["start_station"],))
             start_station = c.fetchone()
             if not start_station:
                 raise HttpException(requests.codes['not_found'], "リクエストされた列車の始発駅データがみつかりません")
 
-            c.execute(sql, (train["last_station"], ))
+            c.execute(sql, (train["last_station"],))
             last_station = c.fetchone()
             if not last_station:
                 raise HttpException(requests.codes['not_found'], "リクエストされた列車の終着駅データがみつかりません")
 
-
-            c.execute(sql, (departure_name, ))
+            c.execute(sql, (departure_name,))
             from_station = c.fetchone()
             if not from_station:
                 raise HttpException(requests.codes['not_found'], "リクエストされた乗車駅データがみつかりません")
 
-            c.execute(sql, (arrival_name, ))
+            c.execute(sql, (arrival_name,))
             to_station = c.fetchone()
             if not to_station:
                 raise HttpException(requests.codes['not_found'], "リクエストされた降車駅データがみつかりません")
@@ -675,7 +656,6 @@ def post_reserve():
 
             if train["train_class"] not in usable_train_class_list:
                 raise HttpException(requests.codes['bad_request'], "invalid train_class")
-
 
             # 運行していない区間を予約していないかチェックする
             if train["is_nobori"]:
@@ -691,14 +671,13 @@ def post_reserve():
 
             # あいまい座席検索
             # seatsが空白の時に発動する
-            if not seats and seat_class != "non-reserved": #non-reservedはそもそもあいまい検索もせずダミーのRow/Columnで予約を確定させる。
+            if not seats and seat_class != "non-reserved":  # non-reservedはそもそもあいまい検索もせずダミーのRow/Columnで予約を確定させる。
 
-                for car_number in range(1,17):
+                for car_number in range(1, 17):
                     sql = "SELECT * FROM seat_master WHERE train_class=%s AND car_number=%s AND seat_class=%s AND is_smoking_seat=%s ORDER BY seat_row, seat_column"
                     c.execute(sql, (train_class, car_number, seat_class, is_smoking_seat))
                     seat_list = c.fetchall()
-                    seats = [] # 予約対象席を空っぽに
-
+                    seats = []  # 予約対象席を空っぽに
 
                     for seat in seat_list:
                         sql = "SELECT s.* FROM seat_reservations s, reservations r WHERE r.date=%s AND r.train_class=%s AND r.train_name=%s AND car_number=%s AND seat_row=%s AND seat_column=%s FOR UPDATE"
@@ -736,20 +715,20 @@ def post_reserve():
                                     is_occupied = True
 
                         seat_information_list.append({
-                            "row": seat["seat_row"],
-                            "column": seat["seat_column"],
-                            "class": seat["seat_class"],
+                            "row":             seat["seat_row"],
+                            "column":          seat["seat_column"],
+                            "class":           seat["seat_class"],
                             "is_smoking_seat": seat["is_smoking_seat"],
-                            "is_occupied": is_occupied,
+                            "is_occupied":     is_occupied,
                         })
 
                     # 曖昧予約席とその他の候補席を選出
-                    seatnum = adult + child - 1 #予約する座席の合計数 全体の人数からあいまい指定席分を引いておく
-                    reserved = False #あいまい指定席確保済フラグ
-                    vargue = True #あいまい検索フラグ
-                    vague_seat = None #あいまい指定席保存用
+                    seatnum = adult + child - 1  # 予約する座席の合計数 全体の人数からあいまい指定席分を引いておく
+                    reserved = False  # あいまい指定席確保済フラグ
+                    vargue = True  # あいまい検索フラグ
+                    vague_seat = None  # あいまい指定席保存用
 
-                    if not column: #A/B/C/D/Eを指定しなければ、空いている適当な指定席を取るあいまいモード
+                    if not column:  # A/B/C/D/Eを指定しなければ、空いている適当な指定席を取るあいまいモード
                         seatnum = adult + child
                         reserved = True
                         vargue = False
@@ -758,29 +737,29 @@ def post_reserve():
 
                     i = 0
                     for seat in seat_information_list:
-                        if seat["column"] == column and not seat["is_occupied"] and not reserved and vargue: # あいまい席があいてる
+                        if seat["column"] == column and not seat["is_occupied"] and not reserved and vargue:  # あいまい席があいてる
                             vargue_seat = {
-                                "row": seat["row"],
+                                "row":    seat["row"],
                                 "column": seat["column"],
                             }
                             reserved = True
-                        elif not seat["is_occupied"] and i < seatnum: #単に席があいてる
+                        elif not seat["is_occupied"] and i < seatnum:  # 単に席があいてる
                             candidate_seat_list.append({
-                                "row": seat["row"],
+                                "row":    seat["row"],
                                 "column": seat["column"],
                             })
-                            i+=1
+                            i += 1
 
-                    if vargue and reserved: # あいまい席が見つかり、予約できそうだった
+                    if vargue and reserved:  # あいまい席が見つかり、予約できそうだった
                         seats.append(vague_seat)
-                    if i>0: # 候補席があった
+                    if i > 0:  # 候補席があった
                         seats += candidate_seat_list
 
                     if len(seats) < (adult + child):
                         # リクエストに対して席数が足りてない
                         # 次の号車にうつしたい
                         app.logger.warn("-----------------")
-                        app.logger.warn("現在検索中の車両: %d号車, リクエスト座席数: %d, 予約できそうな座席数: %d, 不足数: %d", car_number, adult+child, len(seats), adult+child-len(seats))
+                        app.logger.warn("現在検索中の車両: %d号車, リクエスト座席数: %d, 予約できそうな座席数: %d, 不足数: %d", car_number, adult + child, len(seats), adult + child - len(seats))
                         app.logger.warn("リクエストに対して座席数が不足しているため、次の車両を検索します。")
                         if car_number == 16:
                             app.logger.warn("この新幹線にまとめて予約できる席数がなかったから検索をやめるよ")
@@ -788,13 +767,12 @@ def post_reserve():
 
                     else:
                         app.logger.warn("空き実績: %d号車 シート:%s 席数:%d", car_number, seats, len(seats))
-                        seats = seats[:adult+child]
+                        seats = seats[:adult + child]
                         break
 
             else:
                 if len(seats) != (adult + child):
                     raise HttpException(requests.codes['bad_request'], "座席数が正しくありません")
-
 
             # 座席情報のValidate
             for seat in seats:
@@ -802,7 +780,6 @@ def post_reserve():
                 c.execute(sql, (train_class, car_number, seat["column"], seat["row"], seat_class))
                 if not c.fetchone():
                     raise HttpException(requests.codes['not_found'], "リクエストされた座席情報は存在しません。号車・喫煙席・座席クラスなど組み合わせを見直してください")
-
 
             # 当該列車・列車名の予約一覧取得
             sql = "SELECT * FROM reservations WHERE date=%s AND train_class=%s AND train_name=%s FOR UPDATE"
@@ -812,7 +789,6 @@ def post_reserve():
             for reservation in reservations:
                 if seat_class == "non-reserved":
                     continue
-
 
                 # 予約情報の乗車区間の駅IDを求める
                 sql = "SELECT * FROM station_master WHERE name=%s"
@@ -864,18 +840,17 @@ def post_reserve():
                 seats = []
                 for num in range(adult, child):
                     seats.appaned({
-                        "raw": 0,
+                        "raw":    0,
                         "column": "",
                     })
 
             fare = calc_fare(c, date, from_station, to_station, train_class, seat_class)
 
-            sumFare = int(adult * fare) + int(child*fare/2)
+            sumFare = int(adult * fare) + int(child * fare / 2)
             app.logger.warn("SUMFARE %d", sumFare)
 
             # userID取得。ログインしてないと怒られる。
             user = get_user()
-
 
             # 予約ID発行と予約情報登録
             sql = "INSERT INTO `reservations` (`user_id`, `date`, `train_class`, `train_name`, `departure`, `arrival`, `status`, `payment_id`, `adult`, `child`, `amount`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
@@ -914,9 +889,10 @@ def post_reserve():
 
     return flask.jsonify({
         "reservation_id": reservation_id,
-        "amount": sumFare,
-        "is_ok": True,
+        "amount":         sumFare,
+        "is_ok":          True,
     })
+
 
 @app.route("/api/train/reservation/commit", methods=["POST"])
 def post_commit():
@@ -943,7 +919,6 @@ def post_commit():
             if not reservation:
                 raise HttpException(requests.codes['not_found'], "予約情報がみつかりません")
 
-
             if reservation["user_id"] != user["id"]:
                 raise HttpException(requests.codes['forbidden'], "他のユーザIDの支払いはできません")
 
@@ -952,11 +927,11 @@ def post_commit():
 
             payment_api = os.getenv('PAYMENT_API', 'http://payment:5000')
 
-            res = requests.post(payment_api+"/payment", json={
-                "payment_information":{
-                    "card_token": card_token,
+            res = requests.post(payment_api + "/payment", json={
+                "payment_information": {
+                    "card_token":     card_token,
                     "reservation_id": reservation["reservation_id"],
-                    "amount": reservation["amount"],
+                    "amount":         reservation["amount"],
                 }
             })
 
@@ -987,6 +962,7 @@ def get_auth():
         "email": user["email"],
     })
 
+
 @app.route("/api/auth/signup", methods=["POST"])
 def post_signup():
     email = flask.request.json['email']
@@ -1005,11 +981,11 @@ def post_signup():
 
     return message_response("registration complete")
 
+
 @app.route("/api/auth/login", methods=["POST"])
 def post_login():
     email = flask.request.json['email']
     password = flask.request.json['password']
-
 
     try:
         conn = dbh()
@@ -1031,11 +1007,13 @@ def post_login():
 
     return message_response("ok")
 
+
 @app.route("/api/auth/logout", methods=["POST"])
 def post_logout():
     if "user_id" in flask.session:
-        del(flask.session['user_id'])
+        del (flask.session['user_id'])
     return message_response("ok")
+
 
 @app.route("/api/user/reservations", methods=["GET"])
 def get_user_reservations():
@@ -1056,8 +1034,8 @@ def get_user_reservations():
         app.logger.exception(err)
         raise HttpException(requests.codes['internal_server_error'], "db error")
 
-
     return flask.jsonify(ret)
+
 
 @app.route("/api/user/reservations/<item_id>", methods=["GET"])
 def get_user_reservation_detail(item_id):
@@ -1082,7 +1060,6 @@ def get_user_reservation_detail(item_id):
     return flask.jsonify(reservation)
 
 
-
 @app.route("/api/user/reservations/<item_id>/cancel", methods=["POST"])
 def post_user_reservation_cancel(item_id):
     user = get_user()
@@ -1097,7 +1074,6 @@ def post_user_reservation_cancel(item_id):
             if not reservation:
                 raise HttpException(requests.codes['not_found'], "Reservation not found")
 
-
             if reservation["status"] == "rejected":
                 raise HttpException(requests.codes['internal_server_error'], "何らかの理由により予約はRejected状態です")
 
@@ -1105,7 +1081,7 @@ def post_user_reservation_cancel(item_id):
 
                 payment_api = os.getenv('PAYMENT_API', 'http://payment:5000')
 
-                res = requests.delete(payment_api+"/payment/" + reservation["payment_id"])
+                res = requests.delete(payment_api + "/payment/" + reservation["payment_id"])
 
                 if res.status_code != 200:
                     raise HttpException(requests.codes['internal_server_error'], "決済のキャンセルに失敗しました")
@@ -1115,9 +1091,6 @@ def post_user_reservation_cancel(item_id):
 
             sql = "DELETE FROM seat_reservations WHERE reservation_id=%s"
             c.execute(sql, (reservation["reservation_id"],))
-
-
-
     except MySQLdb.Error as err:
         conn.rollback()
         app.logger.exception(err)
@@ -1129,7 +1102,6 @@ def post_user_reservation_cancel(item_id):
     return message_response("cancel completed")
 
 
-
 @app.route("/api/settings", methods=["GET"])
 def get_settings():
     return flask.jsonify({
@@ -1139,7 +1111,6 @@ def get_settings():
 
 @app.route("/initialize", methods=["POST"])
 def post_initialize():
-
     conn = dbh()
     with conn.cursor() as c:
         c.execute("TRUNCATE seat_reservations")
@@ -1147,9 +1118,10 @@ def post_initialize():
         c.execute("TRUNCATE users")
 
     return flask.jsonify({
-        "language": "python", # 実装言語を返す
+        "language":       "python",  # 実装言語を返す
         "available_days": AvailableDays,
     })
+
 
 if __name__ == "__main__":
     app.logger.setLevel(logging.DEBUG)

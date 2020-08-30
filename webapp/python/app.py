@@ -838,7 +838,7 @@ def post_reserve():
                 car_number = 0
                 seats = []
                 for num in range(adult, child):
-                    seats.appaned({
+                    seats.append({
                         "raw":    0,
                         "column": "",
                     })

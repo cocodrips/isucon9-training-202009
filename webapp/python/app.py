@@ -496,9 +496,9 @@ def get_train_seats():
             if not train:
                 raise HttpException(requests.codes['not_found'], "列車が存在しません")
 
-            sql = "SELECT * FROM station_master WHERE name=%s"
-            c.execute(sql, (from_name,))
-            from_station = c.fetchone()
+            if not station_master:
+                load_station()
+            from_station = station_master.get(from_name)
             if not from_station:
                 raise HttpException(requests.codes['bad_request'], "fromStation: no rows")
 
@@ -551,11 +551,10 @@ def get_train_seats():
                     c.execute(sql, (seat_reservation["reservation_id"],))
                     reservation = c.fetchone()
 
-                    sql = "SELECT * FROM station_master WHERE name=%s"
-                    c.execute(sql, (reservation["departure"],))
-                    departure_station = c.fetchone()
-                    c.execute(sql, (reservation["arrival"],))
-                    arrival_station = c.fetchone()
+                    if not station_master:
+                        load_station()
+                    departure_station = station_master.get(reservation["departure"])
+                    arrival_station = station_master.get(reservation["arrival"])
 
                     if train["is_nobori"]:
                         if to_station["id"] < arrival_station["id"] and from_station["id"] <= arrival_station["id"]:
@@ -641,24 +640,22 @@ def post_reserve():
             if not train:
                 raise HttpException(requests.codes['not_found'], "列車が存在しません")
 
-            sql = "SELECT * FROM station_master WHERE name=%s"
-            c.execute(sql, (train["start_station"],))
-            start_station = c.fetchone()
+            if not station_master:
+                load_station()
+
+            start_station = station_master.get(train["start_station"])
             if not start_station:
                 raise HttpException(requests.codes['not_found'], "リクエストされた列車の始発駅データがみつかりません")
 
-            c.execute(sql, (train["last_station"],))
-            last_station = c.fetchone()
+            last_station = station_master.get(train["last_station"])
             if not last_station:
                 raise HttpException(requests.codes['not_found'], "リクエストされた列車の終着駅データがみつかりません")
 
-            c.execute(sql, (departure_name,))
-            from_station = c.fetchone()
+            from_station = station_master.get(departure_name)
             if not from_station:
                 raise HttpException(requests.codes['not_found'], "リクエストされた乗車駅データがみつかりません")
 
-            c.execute(sql, (arrival_name,))
-            to_station = c.fetchone()
+            to_station = station_master.get(arrival_name)
             if not to_station:
                 raise HttpException(requests.codes['not_found'], "リクエストされた降車駅データがみつかりません")
 
@@ -703,11 +700,11 @@ def post_reserve():
                             if not reservation:
                                 raise HttpException(requests.codes['bad_request'], "reservationが見つかりません")
 
-                            sql = "SELECT * FROM station_master WHERE name=%s"
-                            c.execute(sql, (reservation["departure"],))
-                            departure_station = c.fetchone()
-                            c.execute(sql, (reservation["arrival"],))
-                            arrival_station = c.fetchone()
+                            if not station_master:
+                                load_station()
+
+                            departure_station = station_master.get(reservation["departure"])
+                            arrival_station = station_master.get(reservation["arrival"])
 
                             if train["is_nobori"]:
                                 if to_station["id"] < arrival_station["id"] and from_station["id"] <= arrival_station["id"]:
@@ -801,14 +798,14 @@ def post_reserve():
                     continue
 
                 # 予約情報の乗車区間の駅IDを求める
-                sql = "SELECT * FROM station_master WHERE name=%s"
-                c.execute(sql, (reservation["departure"],))
-                reservedfromStation = c.fetchone()
+                if not station_master:
+                    load_station()
+
+                reservedfromStation = station_master.get(reservation["departure"])
                 if not reservedfromStation:
                     raise HttpException(requests.codes['internal_server_error'], "予約情報に記載された列車の乗車駅データがみつかりません")
 
-                c.execute(sql, (reservation["arrival"],))
-                reservedtoStation = c.fetchone()
+                reservedtoStation = station_master.get(reservation["arrival"])
                 if not reservedtoStation:
                     raise HttpException(requests.codes['internal_server_error'], "予約情報に記載された列車の降車駅データがみつかりません")
 

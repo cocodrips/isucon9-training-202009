@@ -7,7 +7,9 @@ import logging
 import flask
 import pbkdf2
 import requests
-import MySQLdb.cursors
+from mysql.connector import Error
+from mysql.connector.pooling import MySQLConnectionPool
+
 
 JST = datetime.timezone(datetime.timedelta(hours=+9), 'JST')
 
@@ -40,24 +42,28 @@ class HttpException(Exception):
         return response
 
 
+cnxpool = MySQLConnectionPool(
+    pool_name="mypool",
+    pool_size=os.getenv('MYSQL_POOL_SIZE', 20),
+    host=os.getenv('MYSQL_HOSTNAME', 'localhost'),
+    port=int(os.getenv('MYSQL_PORT', 3306)),
+    user=os.getenv('MYSQL_USER', 'isutrain'),
+    password=os.getenv('MYSQL_PASSWORD', 'isutrain'),
+    db=os.getenv('MYSQL_DATABASE', 'isutrain'),
+    charset='utf8mb4',
+    autocommit=True,
+)
+
+
 def dbh():
     if not hasattr(flask.g, 'db'):
-        flask.g.db = MySQLdb.connect(
-            host=os.getenv('MYSQL_HOSTNAME', 'localhost'),
-            port=int(os.getenv('MYSQL_PORT', 3306)),
-            user=os.getenv('MYSQL_USER', 'isutrain'),
-            password=os.getenv('MYSQL_PASSWORD', 'isutrain'),
-            db=os.getenv('MYSQL_DATABASE', 'isutrain'),
-            charset='utf8mb4',
-            cursorclass=MySQLdb.cursors.DictCursor,
-            autocommit=True,
-        )
+        flask.g.db = cnxpool.get_connection()
     return flask.g.db
 
 
 def load_station():
     conn = dbh()
-    with conn.cursor() as c:
+    with conn.cursor(dictionary=True) as c:
         sql = "SELECT * FROM station_master"
         c.execute(sql)
         for row in c.fetchall():
@@ -69,13 +75,13 @@ def get_user():
         raise HttpException(requests.codes['unauthorized'], "no session")
     try:
         conn = dbh()
-        with conn.cursor() as c:
+        with conn.cursor(dictionary=True) as c:
             sql = "SELECT * FROM `users` WHERE `id` = %s"
             c.execute(sql, [user_id])
             user = c.fetchone()
             if user is None:
                 raise HttpException(requests.codes['unauthorized'], "user not found")
-    except MySQLdb.Error as err:
+    except Error as err:
         app.logger.exception(err)
         raise HttpException(requests.codes['internal_server_error'], "db error")
     return user
@@ -158,7 +164,7 @@ def get_available_seats_from_train(c, train, from_station, to_station, seat_clas
             if key in available_set_map:
                 del (available_set_map[key])
 
-    except MySQLdb.Error as err:
+    except Error as err:
         app.logger.exception(err)
         raise HttpException(requests.codes['internal_server_error'], "db error")
 
@@ -260,7 +266,7 @@ def get_stations():
 
     try:
         conn = dbh()
-        with conn.cursor() as c:
+        with conn.cursor(dictionary=True) as c:
             sql = "SELECT * FROM `station_master` ORDER BY id"
             c.execute(sql)
 
@@ -276,7 +282,7 @@ def get_stations():
                 station["is_stop_local"] = True if station["is_stop_local"] else False
                 station_list.append(station)
 
-    except MySQLdb.Error as err:
+    except Error as err:
         app.logger.exception(err)
         raise HttpException(requests.codes['internal_server_error'], "db error")
 
@@ -301,7 +307,7 @@ def get_train_search():
 
     try:
         conn = dbh()
-        with conn.cursor() as c:
+        with conn.cursor(dictionary=True) as c:
             if not station_master:
                 load_station()
             from_station = station_master.get(from_name)
@@ -457,7 +463,7 @@ def get_train_search():
 
                     if len(trainSearchResponseList) >= 10:
                         break
-    except MySQLdb.Error as err:
+    except Error as err:
         app.logger.exception(err)
         raise HttpException(requests.codes['internal_server_error'], "db error")
 
@@ -483,7 +489,7 @@ def get_train_seats():
 
     try:
         conn = dbh()
-        with conn.cursor() as c:
+        with conn.cursor(dictionary=True) as c:
             sql = "SELECT * FROM train_master WHERE date=%s AND train_class=%s AND train_name=%s"
             c.execute(sql, (str(date), train_class, train_name))
             train = c.fetchone()
@@ -584,7 +590,7 @@ def get_train_seats():
 
                 i += 1
 
-    except MySQLdb.Error as err:
+    except Error as err:
         app.logger.exception(err)
         raise HttpException(requests.codes['internal_server_error'], "db error")
 
@@ -627,7 +633,7 @@ def post_reserve():
 
     try:
         conn = dbh()
-        with conn.cursor() as c:
+        with conn.cursor(dictionary=True) as c:
 
             sql = "SELECT * FROM train_master WHERE date=%s AND train_class=%s AND train_name=%s"
             c.execute(sql, (str(date), train_class, train_name))
@@ -882,7 +888,7 @@ def post_reserve():
             for seat in seats:
                 c.execute(sql, (reservation_id, car_number, seat["row"], seat["column"]))
 
-    except MySQLdb.Error as err:
+    except Error as err:
         conn.rollback()
         app.logger.exception(err)
         raise HttpException(requests.codes['internal_server_error'], "db error")
@@ -914,7 +920,7 @@ def post_commit():
 
     try:
         conn = dbh()
-        with conn.cursor() as c:
+        with conn.cursor(dictionary=True) as c:
             # 予約IDで検索
             sql = "SELECT * FROM reservations WHERE reservation_id=%s"
             c.execute(sql, (reservation_id,))
@@ -947,7 +953,7 @@ def post_commit():
             sql = "UPDATE reservations SET status=%s, payment_id=%s WHERE reservation_id=%s"
             c.execute(sql, ("done", payment_res["payment_id"], reservation["reservation_id"]))
 
-    except MySQLdb.Error as err:
+    except Error as err:
         conn.rollback()
         app.logger.exception(err)
         raise HttpException(requests.codes['internal_server_error'], "db error")
@@ -974,11 +980,11 @@ def post_signup():
 
     try:
         conn = dbh()
-        with conn.cursor() as c:
+        with conn.cursor(dictionary=True) as c:
             sql = "INSERT INTO `users` (`email`, `salt`, `super_secure_password`) VALUES (%s, %s, %s)"
             c.execute(sql, (email, "", super_secure_password))
 
-    except MySQLdb.Error as err:
+    except Error as err:
         app.logger.exception(err)
         raise HttpException(requests.codes['internal_server_error'], "db error")
 
@@ -992,7 +998,7 @@ def post_login():
 
     try:
         conn = dbh()
-        with conn.cursor() as c:
+        with conn.cursor(dictionary=True) as c:
             sql = "SELECT * FROM users WHERE email=%s"
             c.execute(sql, (email,))
             user = c.fetchone()
@@ -1004,7 +1010,7 @@ def post_login():
 
             flask.session['user_id'] = user["id"]
 
-    except MySQLdb.Error as err:
+    except Error as err:
         app.logger.exception(err)
         raise HttpException(requests.codes['internal_server_error'], "db error")
 
@@ -1025,7 +1031,7 @@ def get_user_reservations():
     ret = []
     try:
         conn = dbh()
-        with conn.cursor() as c:
+        with conn.cursor(dictionary=True) as c:
             sql = "SELECT * FROM reservations WHERE user_id=%s"
             c.execute(sql, (user["id"],))
             reservations = c.fetchall()
@@ -1033,7 +1039,7 @@ def get_user_reservations():
             for reservation in reservations:
                 ret.append(make_reservation_response(c, reservation))
 
-    except MySQLdb.Error as err:
+    except Error as err:
         app.logger.exception(err)
         raise HttpException(requests.codes['internal_server_error'], "db error")
 
@@ -1047,7 +1053,7 @@ def get_user_reservation_detail(item_id):
     reservation = None
     try:
         conn = dbh()
-        with conn.cursor() as c:
+        with conn.cursor(dictionary=True) as c:
             sql = "SELECT * FROM reservations WHERE user_id=%s AND reservation_id=%s"
             c.execute(sql, (user["id"], item_id))
             reservation = c.fetchone()
@@ -1056,7 +1062,7 @@ def get_user_reservation_detail(item_id):
 
             reservation = make_reservation_response(c, reservation)
 
-    except MySQLdb.Error as err:
+    except Error as err:
         app.logger.exception(err)
         raise HttpException(requests.codes['internal_server_error'], "db error")
 
@@ -1070,7 +1076,7 @@ def post_user_reservation_cancel(item_id):
     reservation = None
     try:
         conn = dbh()
-        with conn.cursor() as c:
+        with conn.cursor(dictionary=True) as c:
             sql = "SELECT * FROM reservations WHERE user_id=%s AND reservation_id=%s"
             c.execute(sql, (user["id"], item_id))
             reservation = c.fetchone()
@@ -1094,7 +1100,7 @@ def post_user_reservation_cancel(item_id):
 
             sql = "DELETE FROM seat_reservations WHERE reservation_id=%s"
             c.execute(sql, (reservation["reservation_id"],))
-    except MySQLdb.Error as err:
+    except Error as err:
         conn.rollback()
         app.logger.exception(err)
         raise HttpException(requests.codes['internal_server_error'], "db error")
@@ -1116,7 +1122,7 @@ def get_settings():
 def post_initialize():
     app.logger.info('INITIALIZE!!!')
     conn = dbh()
-    with conn.cursor() as c:
+    with conn.cursor(dictionary=True) as c:
         c.execute("TRUNCATE seat_reservations")
         c.execute("TRUNCATE reservations")
         c.execute("TRUNCATE users")

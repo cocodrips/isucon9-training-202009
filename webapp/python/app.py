@@ -13,6 +13,9 @@ JST = datetime.timezone(datetime.timedelta(hours=+9), 'JST')
 
 app = flask.Flask(__name__)
 app.config['SECRET_KEY'] = 'isutrain'
+logging.basicConfig(level=logging.DEBUG)
+app.logger.info('running test!!!!!!!!!!!!!')
+
 
 AvailableDays = 10
 SessionName = "session_isutrain"
@@ -1108,6 +1111,7 @@ def get_settings():
 
 @app.route("/initialize", methods=["POST"])
 def post_initialize():
+    app.logger.info('INITIALIZE!!!')
     conn = dbh()
     with conn.cursor() as c:
         c.execute("TRUNCATE seat_reservations")

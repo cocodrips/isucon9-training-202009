@@ -16,3 +16,6 @@ services:
     # development only
     ports:
       - "13306:3306"
+
+volumes:
+  mysql:

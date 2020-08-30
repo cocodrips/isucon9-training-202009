@@ -323,8 +323,6 @@ def get_train_search():
                 sql = "SELECT * FROM train_master WHERE date=%s AND is_nobori=%s AND train_class=%s"
                 c.execute(sql, (str(use_at.date()), is_nobori, train_class))
 
-            train_search_response_list = []
-
             train_list = c.fetchall()
 
             for train in train_list:
@@ -536,8 +534,8 @@ def get_train_seats():
                     )
                 )
 
-                seat_roweservation_list = c.fetchall()
-                for seat_roweservation in seat_roweservation_list:
+                seat_reservation_list = c.fetchall()
+                for seat_reservation in seat_reservation_list:
                     sql = "SELECT * FROM reservations WHERE reservation_id=%s"
                     c.execute(sql, (seat_reservation["reservation_id"],))
                     reservation = c.fetchone()

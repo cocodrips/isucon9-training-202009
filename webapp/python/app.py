@@ -149,14 +149,14 @@ def get_available_seats_from_train(c, train, from_station, to_station):
 
     try:
         # sql = "SELECT * FROM seat_master WHERE train_class=%s AND seat_class=%s AND is_smoking_seat=%s"
-        sql = "SELECT * FROM seat_master WHERE train_class=%s"
+        sql = 'SELECT * FROM seat_master WHERE train_class=%s and seat_class!="non-reserved"'
 
         c.execute(sql, (train["train_class"], ))
         seat_list = c.fetchall()
 
         for seat in seat_list:
-            if seat['seat_class'] == 'non-reserved':
-                continue
+            # if seat['seat_class'] == 'non-reserved':
+            #     continue
             available_set_map = availables[seat['seat_class']][seat['is_smoking_seat']]
             available_set_map["{}_{}_{}".format(seat["car_number"], seat["seat_row"], seat["seat_column"])] = seat
 
@@ -181,6 +181,7 @@ def get_available_seats_from_train(c, train, from_station, to_station):
         c.execute(sql, (from_station["id"], from_station["id"], to_station["id"], to_station["id"], from_station["id"], to_station["id"]))
         seat_reservation_list = c.fetchall()
 
+        app.logger.debug(f"resavations: {seat_reservation_list}")
         for seat in seat_reservation_list:
             if not seat.get('seat_class'):
                 continue
@@ -219,7 +220,7 @@ def calc_fare(c, date, from_station, to_station, train_class, seat_class):
     distance = abs(to_station["distance"] - from_station["distance"])
     distFare = get_distance_fare(c, distance)
 
-    app.logger.info("distFare {}".format(distFare))
+    # app.logger.info("distFare {}".format(distFare))
 
     sql = "SELECT * FROM fare_master WHERE train_class=%s AND seat_class=%s ORDER BY start_date"
     c.execute(sql, (train_class, seat_class))
@@ -232,10 +233,10 @@ def calc_fare(c, date, from_station, to_station, train_class, seat_class):
 
     for fare in fareList:
         if fare["start_date"].date() <= date:
-            app.logger.info("%s %s", fare["start_date"].date(), fare["fare_multiplier"])
+            # app.logger.info("%s %s", fare["start_date"].date(), fare["fare_multiplier"])
             selectedFare = fare
 
-    app.logger.info("%%%%%%%%%%%%%%%%%%%")
+    # app.logger.info("%%%%%%%%%%%%%%%%%%%")
     return int(distFare * selectedFare["fare_multiplier"])
 
 

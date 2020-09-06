@@ -17,7 +17,8 @@ JST = datetime.timezone(datetime.timedelta(hours=+9), 'JST')
 
 app = flask.Flask(__name__)
 app.config['SECRET_KEY'] = 'isutrain'
-logging.basicConfig(level=logging.DEBUG)
+log_format = "%(levelname)s:%(message)s\tlocation:%(pathname)s(%(lineno)s)\tfn:%(funcName)s"
+logging.basicConfig(level=logging.DEBUG, format=log_format)
 app.logger.info('running test!!!!!!!!!!!!!')
 
 

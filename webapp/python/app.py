@@ -154,8 +154,6 @@ def get_available_seats_from_train(c, train, from_station, to_station):
         c.execute(sql, (train["train_class"], ))
         seat_list = c.fetchall()
 
-        app.logger.debug(seat_list)
-
         for seat in seat_list:
             if seat['seat_class'] == 'non-reserved':
                 continue

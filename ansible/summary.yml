@@ -1,0 +1,9 @@
+- hosts: app
+  become: yes
+  roles:
+    - summary_accesslog
+
+- hosts: db
+  become: yes
+  roles:
+    - summary_slowquery

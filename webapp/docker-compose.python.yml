@@ -10,7 +10,7 @@ services:
       - ".env"
     environment:
       - "PAYMENT_API"
-    links:
-      - mysql
+#     links:
+#       - mysql
     ports:
       - "127.0.0.1:8000:8000"

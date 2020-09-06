@@ -1,0 +1,9 @@
+- hosts: app
+  become: yes
+  roles:
+    - clean_log
+
+- hosts: db
+  become: yes
+  roles:
+    - clean_log

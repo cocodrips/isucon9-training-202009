@@ -9,4 +9,7 @@ ADD requirements.txt /opt/webapp
 
 RUN pip install -r requirements.txt
 
+# TODO: DELETE
+RUN pip install -r requirements.dev.txt
+
 CMD ["gunicorn" ,"app:app", "--reload", "-b", "0.0.0.0:8000"]

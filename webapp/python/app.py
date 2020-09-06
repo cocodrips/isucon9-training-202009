@@ -10,6 +10,8 @@ import requests
 from mysql.connector import Error
 from mysql.connector.pooling import MySQLConnectionPool
 
+from wsgi_lineprof.middleware import LineProfilerMiddleware
+
 
 JST = datetime.timezone(datetime.timedelta(hours=+9), 'JST')
 
@@ -1132,8 +1134,33 @@ def post_initialize():
 
 
 
+@app.route("/profile", methods=["GET"])
+def get_profile():
+    for rule in app.url_map.iter_rules():
+        f = globals()[rule.endpoint]
+        if f.getattr('calls'):
+            print(f.calls)
+
+    return flask.jsonify({
+        "language":       "python",  # 実装言語を返す
+        "available_days": AvailableDays,
+    })
+
+
 # Load first
 
 if __name__ == "__main__":
+    import pathlib
+    from wsgi_lineprof.filters import FilenameFilter
+
     app.logger.setLevel(logging.DEBUG)
-    app.run(port=8001, debug=True, threaded=True)
+
+    log_path = pathlib.Path('/tmp/profile.log')
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(log_path, "w") as f:
+        filters = [
+            FilenameFilter("app.py"),
+            lambda stats: filter(lambda stat: stat.total_time > 0.001, stats),
+        ]
+        app.wsgi_app = LineProfilerMiddleware(app.wsgi_app, stream=f, filters=filters)
+        app.run(port=8001, debug=True, threaded=True)

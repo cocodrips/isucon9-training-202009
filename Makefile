@@ -26,3 +26,7 @@ run-local: build
 	docker-compose -f webapp/docker-compose.local.yml -f webapp/docker-compose.$(LANGUAGE).yml up
 remove:
 	docker-compose -f webapp/docker-compose.local.yml -f webapp/docker-compose.$(LANGUAGE).yml rm
+
+profile:
+	wlreporter -f /tmp/profile.log
+	cat /tmp/profile.log_summary_data.log

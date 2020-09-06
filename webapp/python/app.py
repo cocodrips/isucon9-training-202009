@@ -182,6 +182,8 @@ def get_available_seats_from_train(c, train, from_station, to_station):
         seat_reservation_list = c.fetchall()
 
         for seat in seat_reservation_list:
+            if not seat.get('seat_class'):
+                continue
             if seat['seat_class'] == 'non-reserved':
                 continue
             available_set_map =  availables[seat['seat_class']][seat['is_smoking_seat']]

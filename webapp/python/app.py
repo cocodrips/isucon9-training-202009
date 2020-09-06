@@ -1134,21 +1134,7 @@ def post_initialize():
 
 
 
-@app.route("/profile", methods=["GET"])
-def get_profile():
-    for rule in app.url_map.iter_rules():
-        f = globals()[rule.endpoint]
-        if f.getattr('calls'):
-            print(f.calls)
-
-    return flask.jsonify({
-        "language":       "python",  # 実装言語を返す
-        "available_days": AvailableDays,
-    })
-
-
 # Load first
-
 if __name__ == "__main__":
     import pathlib
     from wsgi_lineprof.filters import FilenameFilter

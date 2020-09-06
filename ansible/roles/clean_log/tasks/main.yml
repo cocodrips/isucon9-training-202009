@@ -1,0 +1,11 @@
+- name: cleanup nginx error log
+  shell: echo "" > /var/log/nginx/error.log
+
+- name: cleanup nginx log
+  shell: echo "" > /var/log/nginx/access.log
+
+- name: cleanup mysql slow log
+  shell: echo "" > /var/log/mysql/mysql-slow.log
+
+- name: cleanup mysql slow log
+  shell: echo "" > /var/log/mysql/mysql-slow.log

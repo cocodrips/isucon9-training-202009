@@ -1,0 +1,8 @@
+- name: Restart services
+  docker_compose:
+    project_src: isucon9-final
+    build: yes
+    files:
+      - webapp/docker-compose.nginx.yml
+      - webapp/docker-compose.python.yml
+    restarted: yes

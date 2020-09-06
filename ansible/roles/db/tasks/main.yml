@@ -1,0 +1,16 @@
+#- name: stop and remove services
+#  docker_compose:
+#    project_src: isucon9-final
+#    build: no
+#    files:
+#      - webapp/docker-compose.mysql.yml
+#    state: absent
+#    remove_volumes: yes
+
+- name: build and start service
+  docker_compose:
+    project_src: isucon9-final
+    recreate: always
+    files:
+      - webapp/docker-compose.mysql.yml
+    restarted: yes

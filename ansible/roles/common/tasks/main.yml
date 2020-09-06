@@ -2,7 +2,7 @@
     repo: 'git@github.com:cocodrips/isucon9-training-202009.git'
     dest: /home/isucon/isucon9-final
     update: yes
-    version: master
+    version: lb
     accept_hostkey: yes
     force: yes
   become_user: isucon

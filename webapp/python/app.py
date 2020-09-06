@@ -231,7 +231,6 @@ def calc_fare(c, date, from_station, to_station, train_class, seat_class):
             # app.logger.info("%s %s", fare["start_date"].date(), fare["fare_multiplier"])
             selectedFare = fare
 
-    # app.logger.info("%%%%%%%%%%%%%%%%%%%")
     return int(distFare * selectedFare["fare_multiplier"])
 
 
@@ -342,7 +341,7 @@ def get_train_search():
                 is_nobori = True
 
             usable_train_class_list = get_usable_train_class_list(from_station, to_station)
-            app.logger.info("{}".format(usable_train_class_list))
+            app.logger.info(f"{usable_train_class_list}")
 
             if is_nobori:
                 station_list = list(station_master.values())[::-1]
@@ -632,7 +631,7 @@ def post_reserve():
 
     date = dateutil.parser.parse(body.get('date')).astimezone(JST).date()
 
-    app.logger.info("%s", body)
+    app.logger.info(f"{body}")
 
     train_class = body.get('train_class')
     train_name = body.get('train_name')
@@ -791,14 +790,14 @@ def post_reserve():
                         # リクエストに対して席数が足りてない
                         # 次の号車にうつしたい
                         app.logger.info("-----------------")
-                        app.logger.info("現在検索中の車両: %d号車, リクエスト座席数: %d, 予約できそうな座席数: %d, 不足数: %d", car_number, adult + child, len(seats), adult + child - len(seats))
+                        app.logger.info(f"現在検索中の車両: {car_number}号車, リクエスト座席数: {adult + child}, 予約できそうな座席数: {len(seats)}, 不足数: {adult + child - len(seats)}")
                         app.logger.info("リクエストに対して座席数が不足しているため、次の車両を検索します。")
                         if car_number == 16:
                             app.logger.info("この新幹線にまとめて予約できる席数がなかったから検索をやめるよ")
                             raise HttpException(requests.codes['not_found'], "あいまい座席予約ができませんでした。指定した席、もしくは1車両内に希望の席数をご用意できませんでした。")
 
                     else:
-                        app.logger.info("空き実績: %d号車 シート:%s 席数:%d", car_number, seats, len(seats))
+                        app.logger.info(f"空き実績: {car_number}号車 シート:{seats} 席数:{len(seats)}")
                         seats = seats[:adult + child]
                         break
 
@@ -861,7 +860,7 @@ def post_reserve():
                     for v in seat_reservations:
                         for seat in seats:
                             if v["car_number"] == car_number and v["seat_row"] == seat["row"] and v["seat_column"] == seat["column"]:
-                                app.logger.info("Duplicated ", reservation)
+                                app.logger.info(f"Found duplicated: {reservation}")
                                 raise HttpException(requests.codes['bad_request'], "リクエストに既に予約された席が含まれています")
 
             # 3段階の予約前チェック終わり
@@ -879,7 +878,7 @@ def post_reserve():
             fare = calc_fare(c, date, from_station, to_station, train_class, seat_class)
 
             sumFare = int(adult * fare) + int(child * fare / 2)
-            app.logger.info("SUMFARE %d", sumFare)
+            app.logger.info(f"SUMFARE {sumFare}")
 
             # userID取得。ログインしてないと怒られる。
             user = get_user()

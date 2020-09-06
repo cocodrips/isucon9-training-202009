@@ -416,11 +416,6 @@ def get_train_search():
                     (premium_avail_seats, premium_smoke_avail_seats,
                      reserved_avail_seats, reserved_smoke_avail_seats) = get_available_seats_from_train(c, train, from_station, to_station)
 
-                    # premium_avail_seats = get_available_seats_from_train(c, train, from_station, to_station, "premium", False)
-                    # premium_smoke_avail_seats = get_available_seats_from_train(c, train, from_station, to_station, "premium", True)
-                    # reserved_avail_seats = get_available_seats_from_train(c, train, from_station, to_station, "reserved", False)
-                    # reserved_smoke_avail_seats = get_available_seats_from_train(c, train, from_station, to_station, "reserved", True)
-
                     premium_avail = "○"
                     if len(premium_avail_seats) == 0:
                         premium_avail = "×"

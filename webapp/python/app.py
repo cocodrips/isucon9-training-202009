@@ -19,6 +19,7 @@ logging.basicConfig(level=logging.DEBUG)
 app.logger.info('running test!!!!!!!!!!!!!')
 
 
+# todo: 環境変数にする
 AvailableDays = 10
 SessionName = "session_isutrain"
 
@@ -68,6 +69,7 @@ def load_station():
         c.execute(sql)
         for row in c.fetchall():
             station_master[row['name']] = row
+
 
 def get_user():
     user_id = flask.session.get("user_id")
@@ -139,6 +141,7 @@ def get_available_seats_from_train(c, train, from_station, to_station, seat_clas
         for seat in seat_list:
             available_set_map["{}_{}_{}".format(seat["car_number"], seat["seat_row"], seat["seat_column"])] = seat
 
+        # todo: なにこのクエリ?
         sql = """SELECT sr.reservation_id, sr.car_number, sr.seat_row, sr.seat_column
         FROM seat_reservations sr, reservations r, seat_master s, station_master std, station_master sta
         WHERE
@@ -213,6 +216,7 @@ def calc_fare(c, date, from_station, to_station, train_class, seat_class):
 
 
 def make_reservation_response(c, reservation):
+    # todo: クエリを2つまとめられそう
     sql = "SELECT departure FROM train_timetable_master WHERE date=%s AND train_class=%s AND train_name=%s AND station=%s"
     c.execute(sql, (
         reservation["date"],
@@ -326,7 +330,6 @@ def get_train_search():
                 station_list = list(station_master.values())
             app.logger.info(is_nobori, station_list)
 
-
             if not train_class:
                 sql = "SELECT * FROM train_master WHERE date=%s AND is_nobori=%s"
                 c.execute(sql, (str(use_at.date()), is_nobori))
@@ -378,6 +381,7 @@ def get_train_search():
                 if isContainsOriginStation and isContainsDestStation:
                     # 列車情報
 
+                    # todo: クエリ2つまとめられそう
                     sql = "SELECT departure FROM train_timetable_master WHERE date=%s AND train_class=%s AND train_name=%s AND station=%s"
                     c.execute(sql, (str(use_at.date()), train["train_class"], train["train_name"], from_station["name"]))
                     departure = c.fetchone()
@@ -547,6 +551,7 @@ def get_train_seats():
 
                 seat_reservation_list = c.fetchall()
                 for seat_reservation in seat_reservation_list:
+                    # todo: N+1
                     sql = "SELECT * FROM reservations WHERE reservation_id=%s"
                     c.execute(sql, (seat_reservation["reservation_id"],))
                     reservation = c.fetchone()
@@ -576,6 +581,8 @@ def get_train_seats():
             # 各号車の情報
             i = 1
             while True:
+                # todo: N+1
+                # todo: Cache seat_master? The table has 3942 rows
                 sql = "SELECT * FROM seat_master WHERE train_class=%s AND car_number=%s ORDER BY seat_row, seat_column LIMIT 1"
                 c.execute(sql, (train_class, i))
                 seat = c.fetchone()
@@ -687,6 +694,7 @@ def post_reserve():
                     seats = []  # 予約対象席を空っぽに
 
                     for seat in seat_list:
+                        # todo: N+1
                         sql = "SELECT s.* FROM seat_reservations s, reservations r WHERE r.date=%s AND r.train_class=%s AND r.train_name=%s AND car_number=%s AND seat_row=%s AND seat_column=%s FOR UPDATE"
                         c.execute(sql, (str(date), train_class, train_name, seat["car_number"], seat["seat_row"], seat["seat_column"]))
                         seat_reservation_list = c.fetchall()
@@ -694,6 +702,7 @@ def post_reserve():
                         is_occupied = False
 
                         for seat_reservation in seat_reservation_list:
+                            # todo: N+1
                             sql = "SELECT * FROM reservations WHERE reservation_id=%s FOR UPDATE"
                             c.execute(sql, (seat_reservation["reservation_id"],))
                             reservation = c.fetchone()
@@ -973,6 +982,7 @@ def get_auth():
 def post_signup():
     email = flask.request.json['email']
     password = flask.request.json['password']
+    # todo: たぶん遅い
     super_secure_password = pbkdf2.crypt(password, iterations=100)
 
     try:

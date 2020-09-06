@@ -506,8 +506,7 @@ def get_train_seats():
             if not from_station:
                 raise HttpException(requests.codes['bad_request'], "fromStation: no rows")
 
-            c.execute(sql, (to_name,))
-            to_station = c.fetchone()
+            to_station = station_master.get(to_name)
             if not to_station:
                 raise HttpException(requests.codes['bad_request'], "toStation: no rows")
 

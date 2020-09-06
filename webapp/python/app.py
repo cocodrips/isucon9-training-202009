@@ -45,7 +45,7 @@ class HttpException(Exception):
 
 cnxpool = MySQLConnectionPool(
     pool_name="mypool",
-    pool_size=os.getenv('MYSQL_POOL_SIZE', 20),
+    pool_size=int(os.getenv('MYSQL_POOL_SIZE', 20)),
     host=os.getenv('MYSQL_HOSTNAME', 'localhost'),
     port=int(os.getenv('MYSQL_PORT', 3306)),
     user=os.getenv('MYSQL_USER', 'isutrain'),

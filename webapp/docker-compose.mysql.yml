@@ -20,7 +20,7 @@ services:
   nginx:
     image: nginx:1.17
     volumes:
-      - ./nginx/conf.d/lb.conf:/etc/nginx/conf.d/lb.conf
+      - ./nginx/conf.d/lb.conf:/etc/nginx/conf.d/default.conf
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf
       - /var/log/nginx:/var/log/nginx
       - ./frontend/dist:/opt/isucon/public

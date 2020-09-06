@@ -201,7 +201,7 @@ def calc_fare(c, date, from_station, to_station, train_class, seat_class):
     distance = abs(to_station["distance"] - from_station["distance"])
     distFare = get_distance_fare(c, distance)
 
-    app.logger.warn("distFare {}".format(distFare))
+    app.logger.info("distFare {}".format(distFare))
 
     sql = "SELECT * FROM fare_master WHERE train_class=%s AND seat_class=%s ORDER BY start_date"
     c.execute(sql, (train_class, seat_class))
@@ -214,10 +214,10 @@ def calc_fare(c, date, from_station, to_station, train_class, seat_class):
 
     for fare in fareList:
         if fare["start_date"].date() <= date:
-            app.logger.warn("%s %s", fare["start_date"].date(), fare["fare_multiplier"])
+            app.logger.info("%s %s", fare["start_date"].date(), fare["fare_multiplier"])
             selectedFare = fare
 
-    app.logger.warn("%%%%%%%%%%%%%%%%%%%")
+    app.logger.info("%%%%%%%%%%%%%%%%%%%")
     return int(distFare * selectedFare["fare_multiplier"])
 
 
@@ -328,7 +328,7 @@ def get_train_search():
                 is_nobori = True
 
             usable_train_class_list = get_usable_train_class_list(from_station, to_station)
-            app.logger.warn("{}".format(usable_train_class_list))
+            app.logger.info("{}".format(usable_train_class_list))
 
             if is_nobori:
                 station_list = list(station_master.values())[::-1]
@@ -620,7 +620,7 @@ def post_reserve():
 
     date = dateutil.parser.parse(body.get('date')).astimezone(JST).date()
 
-    app.logger.warn("%s", body)
+    app.logger.info("%s", body)
 
     train_class = body.get('train_class')
     train_name = body.get('train_name')
@@ -778,15 +778,15 @@ def post_reserve():
                     if len(seats) < (adult + child):
                         # リクエストに対して席数が足りてない
                         # 次の号車にうつしたい
-                        app.logger.warn("-----------------")
-                        app.logger.warn("現在検索中の車両: %d号車, リクエスト座席数: %d, 予約できそうな座席数: %d, 不足数: %d", car_number, adult + child, len(seats), adult + child - len(seats))
-                        app.logger.warn("リクエストに対して座席数が不足しているため、次の車両を検索します。")
+                        app.logger.info("-----------------")
+                        app.logger.info("現在検索中の車両: %d号車, リクエスト座席数: %d, 予約できそうな座席数: %d, 不足数: %d", car_number, adult + child, len(seats), adult + child - len(seats))
+                        app.logger.info("リクエストに対して座席数が不足しているため、次の車両を検索します。")
                         if car_number == 16:
-                            app.logger.warn("この新幹線にまとめて予約できる席数がなかったから検索をやめるよ")
+                            app.logger.info("この新幹線にまとめて予約できる席数がなかったから検索をやめるよ")
                             raise HttpException(requests.codes['not_found'], "あいまい座席予約ができませんでした。指定した席、もしくは1車両内に希望の席数をご用意できませんでした。")
 
                     else:
-                        app.logger.warn("空き実績: %d号車 シート:%s 席数:%d", car_number, seats, len(seats))
+                        app.logger.info("空き実績: %d号車 シート:%s 席数:%d", car_number, seats, len(seats))
                         seats = seats[:adult + child]
                         break
 
@@ -849,7 +849,7 @@ def post_reserve():
                     for v in seat_reservations:
                         for seat in seats:
                             if v["car_number"] == car_number and v["seat_row"] == seat["row"] and v["seat_column"] == seat["column"]:
-                                app.logger.warn("Duplicated ", reservation)
+                                app.logger.info("Duplicated ", reservation)
                                 raise HttpException(requests.codes['bad_request'], "リクエストに既に予約された席が含まれています")
 
             # 3段階の予約前チェック終わり
@@ -867,7 +867,7 @@ def post_reserve():
             fare = calc_fare(c, date, from_station, to_station, train_class, seat_class)
 
             sumFare = int(adult * fare) + int(child * fare / 2)
-            app.logger.warn("SUMFARE %d", sumFare)
+            app.logger.info("SUMFARE %d", sumFare)
 
             # userID取得。ログインしてないと怒られる。
             user = get_user()
@@ -915,18 +915,12 @@ def post_reserve():
 
 @app.route("/api/train/reservation/commit", methods=["POST"])
 def post_commit():
-    app.logger.warn("XXXXX1 %s", flask.request)
-    app.logger.warn("XXXXX2 %s", flask.request.form)
-    app.logger.warn("XXXXX3 %s", flask.request.json)
     body = flask.request.json
-    app.logger.warn("XXXX %s", body)
 
     reservation_id = body.get('reservation_id')
     card_token = body.get('card_token')
 
     user = get_user()
-
-    app.logger.warn("/api/train/reservation/commit")
 
     try:
         conn = dbh()

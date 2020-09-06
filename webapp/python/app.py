@@ -159,7 +159,7 @@ def get_available_seats_from_train(c, train, from_station, to_station):
             available_set_map["{}_{}_{}".format(seat["car_number"], seat["seat_row"], seat["seat_column"])] = seat
 
         # todo: なにこのクエリ?
-        sql = """SELECT sr.reservation_id, s.seat_class, sr.car_number, sr.seat_row, sr.seat_column
+        sql = """SELECT sr.reservation_id, s.seat_class, s.is_smoking_seat, sr.car_number, sr.seat_row, sr.seat_column
         FROM seat_reservations sr, reservations r, seat_master s, station_master std, station_master sta
         WHERE
             r.reservation_id=sr.reservation_id AND
@@ -179,7 +179,6 @@ def get_available_seats_from_train(c, train, from_station, to_station):
         c.execute(sql, (from_station["id"], from_station["id"], to_station["id"], to_station["id"], from_station["id"], to_station["id"]))
         seat_reservation_list = c.fetchall()
 
-        app.logger.debug(f"resavations: {seat_reservation_list}")
         for seat in seat_reservation_list:
             available_set_map = availables[seat['seat_class']][seat['is_smoking_seat']]
             key = "{}_{}_{}".format(seat["car_number"], seat["seat_row"], seat["seat_column"])
@@ -336,8 +335,6 @@ def get_train_search():
             from_station = station_master.get(from_name)
             to_station = station_master.get(to_name)
 
-            app.logger.debug(f'{from_station["name"]} -----> {to_station["name"]}')
-
             is_nobori = False
             if from_station["distance"] > to_station["distance"]:
                 is_nobori = True
@@ -349,7 +346,7 @@ def get_train_search():
                 station_list = list(station_master.values())[::-1]
             else:
                 station_list = list(station_master.values())
-            app.logger.debug(f"{is_nobori}, {[(s['name'], s['distance']) for s in station_list]}")
+            # app.logger.debug(f"{is_nobori}, {[(s['name'], s['distance']) for s in station_list]}")
 
             if not train_class:
                 sql = "SELECT * FROM train_master WHERE date=%s AND is_nobori=%s"

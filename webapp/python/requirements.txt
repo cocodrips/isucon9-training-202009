@@ -1,7 +1,7 @@
 gunicorn
 Flask
 requests
-PyMySQL
 python-dateutil
 mysqlclient
 pbkdf2
+mysql-connector-python

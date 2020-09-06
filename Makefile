@@ -27,6 +27,9 @@ run-local: build
 remove:
 	docker-compose -f webapp/docker-compose.local.yml -f webapp/docker-compose.$(LANGUAGE).yml rm
 
+profile:
+	wlreporter -f /tmp/profile.log
+	cat /tmp/profile.log_summary_data.log
 
 SUMMARY:=/tmp/summary.txt
 deploy:
@@ -43,4 +46,3 @@ summary:
 
 	find /tmp/ -name pt-query-digest.txt | xargs cat > $(SUMMARY)
 	curl -F file=@$(SUMMARY) -F "initial_comment=slow query result" -F channels=isucon10 -H "Authorization: Bearer $(ISUCON10_SLACK_TOKEN)" https://slack.com/api/files.upload
-

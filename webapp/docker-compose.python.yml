@@ -8,7 +8,9 @@ services:
       - ./python:/opt/webapp
     env_file:
       - ".env"
-#    links:
-#      - payment
+    environment:
+      - "PAYMENT_API"
+#     links:
+#       - mysql
     ports:
       - "127.0.0.1:8000:8000"

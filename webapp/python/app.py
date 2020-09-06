@@ -1012,7 +1012,7 @@ def post_login():
             if not user:
                 raise HttpException(requests.codes['forbidden'], "authentication failed")
 
-            if pbkdf2.crypt(password, user["super_secure_password"]) != user["super_secure_password"].decode("ascii"):
+            if pbkdf2.crypt(password, user["super_secure_password"]) != user["super_secure_password"]:
                 raise HttpException(requests.codes['forbidden'], "authentication failed")
 
             flask.session['user_id'] = user["id"]

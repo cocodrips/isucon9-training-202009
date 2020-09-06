@@ -8,8 +8,8 @@ services:
       - ./python:/opt/webapp
     env_file:
       - ".env"
-    environment:
-      - "PAYMENT_API"
+#    environment:
+#      - "PAYMENT_API"
 #     links:
 #       - mysql
     ports:

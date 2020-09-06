@@ -155,13 +155,11 @@ def get_available_seats_from_train(c, train, from_station, to_station):
         seat_list = c.fetchall()
 
         for seat in seat_list:
-            # if seat['seat_class'] == 'non-reserved':
-            #     continue
             available_set_map = availables[seat['seat_class']][seat['is_smoking_seat']]
             available_set_map["{}_{}_{}".format(seat["car_number"], seat["seat_row"], seat["seat_column"])] = seat
 
         # todo: なにこのクエリ?
-        sql = """SELECT sr.reservation_id, sr.car_number, sr.seat_row, sr.seat_column
+        sql = """SELECT sr.reservation_id, s.seat_class, sr.car_number, sr.seat_row, sr.seat_column
         FROM seat_reservations sr, reservations r, seat_master s, station_master std, station_master sta
         WHERE
             r.reservation_id=sr.reservation_id AND
@@ -183,11 +181,7 @@ def get_available_seats_from_train(c, train, from_station, to_station):
 
         app.logger.debug(f"resavations: {seat_reservation_list}")
         for seat in seat_reservation_list:
-            if not seat.get('seat_class'):
-                continue
-            if seat['seat_class'] == 'non-reserved':
-                continue
-            available_set_map =  availables[seat['seat_class']][seat['is_smoking_seat']]
+            available_set_map = availables[seat['seat_class']][seat['is_smoking_seat']]
             key = "{}_{}_{}".format(seat["car_number"], seat["seat_row"], seat["seat_column"])
             if key in available_set_map:
                 del (available_set_map[key])

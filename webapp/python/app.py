@@ -328,7 +328,6 @@ def get_train_search():
                 station_list = list(station_master.values())[::-1]
             else:
                 station_list = list(station_master.values())
-            app.logger.info(is_nobori, station_list)
 
             if not train_class:
                 sql = "SELECT * FROM train_master WHERE date=%s AND is_nobori=%s"

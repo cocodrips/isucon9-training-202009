@@ -62,6 +62,12 @@ def dbh():
     return flask.g.db
 
 
+@app.teardown_appcontext
+def teardown(error):
+    if hasattr(flask.g, "db"):
+        flask.g.db.close()
+
+
 def load_station():
     conn = dbh()
     with conn.cursor(dictionary=True) as c:

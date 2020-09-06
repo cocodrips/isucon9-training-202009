@@ -12,4 +12,4 @@ RUN pip install -r requirements.txt
 # TODO: DELETE
 RUN pip install -r requirements.dev.txt
 
-CMD ["gunicorn" ,"app:app", "--reload", "-b", "0.0.0.0:8000"]
+CMD ["gunicorn" ,"app:app", "--reload", "-b", "0.0.0.0:8000", "--workers=5" ]

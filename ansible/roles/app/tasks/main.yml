@@ -6,3 +6,4 @@
       - webapp/docker-compose.nginx.yml
       - webapp/docker-compose.python.yml
     restarted: yes
+    recreate: always

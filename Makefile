@@ -37,6 +37,10 @@ clean:
 	cd ansible && ansible-playbook -i remote clean.yml && cd -
 
 summary:
-	cd ansible && ansible-playbook -i remote benchmark.yml && cd -
+	cd ansible && ansible-playbook -i remote summary.yml && cd -
 	find /tmp/ -name alp.txt | xargs cat > $(SUMMARY)
 	curl -F file=@$(SUMMARY) -F "initial_comment=test" -F channels=isucon10 -H "Authorization: Bearer $(ISUCON10_SLACK_TOKEN)" https://slack.com/api/files.upload
+
+	find /tmp/ -name pt-query-digest.txt | xargs cat > $(SUMMARY)
+	curl -F file=@$(SUMMARY) -F "initial_comment=test" -F channels=isucon10 -H "Authorization: Bearer $(ISUCON10_SLACK_TOKEN)" https://slack.com/api/files.upload
+

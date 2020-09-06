@@ -5,6 +5,7 @@
 - name: cleanup nginx log
   shell: echo "" > /var/log/nginx/access.log
   ignore_errors: true
+
 - name: cleanup mysql slow log
   shell: echo "" > /var/log/mysql/mysql-slow.log
   ignore_errors: true

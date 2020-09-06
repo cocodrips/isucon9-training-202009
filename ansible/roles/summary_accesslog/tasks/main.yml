@@ -1,0 +1,7 @@
+- name: alp
+  shell: cat /var/log/nginx/access.log | alp ltsv -r --sort sum -m '/icons/*','/channel/[0-9]+','/history/[0-9]+','/fonts/*','/js/*','/profile/*','/css/*' > /tmp/alp.txt
+
+- name: Download access log
+  fetch:
+    src: /tmp/alp.txt
+    dest: /tmp

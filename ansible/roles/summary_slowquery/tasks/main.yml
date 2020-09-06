@@ -1,0 +1,7 @@
+- name: pt-query-digest
+  shell: pt-query-digest /var/log/mysql/mysql-slow.log > /tmp/pt-query-digest.txt
+
+- name: Download digest log
+  fetch:
+    src: /tmp/pt-query-digest.txt
+    dest: /tmp

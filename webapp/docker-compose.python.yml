@@ -8,8 +8,6 @@ services:
       - ./python:/opt/webapp
     env_file:
       - ".env"
-    environment:
-      - "PAYMENT_API"
 #    links:
 #      - payment
     ports:

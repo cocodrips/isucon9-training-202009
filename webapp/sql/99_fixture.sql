@@ -11,3 +11,9 @@ INSERT INTO distance_fare_master(distance, fare) VALUES (400, 8300);
 INSERT INTO distance_fare_master(distance, fare) VALUES (500, 12000);
 INSERT INTO distance_fare_master(distance, fare) VALUES (1000, 20000);
 
+create index seat_master_train_class_car_number_index
+	on seat_master (train_class, car_number);
+create index fare_master_train_class_seat_class_index
+	on fare_master (train_class, seat_class);
+create index seat_reservations_reservation_id_index
+	on seat_reservations (reservation_id);

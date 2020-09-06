@@ -7,7 +7,9 @@ import logging
 import flask
 import pbkdf2
 import requests
-import MySQLdb.cursors
+from mysql.connector import Error
+from mysql.connector.pooling import MySQLConnectionPool
+
 
 JST = datetime.timezone(datetime.timedelta(hours=+9), 'JST')
 
@@ -17,6 +19,7 @@ logging.basicConfig(level=logging.DEBUG)
 app.logger.info('running test!!!!!!!!!!!!!')
 
 
+# todo: 環境変数にする
 AvailableDays = 10
 SessionName = "session_isutrain"
 
@@ -40,28 +43,39 @@ class HttpException(Exception):
         return response
 
 
+cnxpool = MySQLConnectionPool(
+    pool_name="mypool",
+    pool_size=int(os.getenv('MYSQL_POOL_SIZE', 20)),
+    host=os.getenv('MYSQL_HOSTNAME', 'localhost'),
+    port=int(os.getenv('MYSQL_PORT', 3306)),
+    user=os.getenv('MYSQL_USER', 'isutrain'),
+    password=os.getenv('MYSQL_PASSWORD', 'isutrain'),
+    db=os.getenv('MYSQL_DATABASE', 'isutrain'),
+    charset='utf8mb4',
+    autocommit=True,
+)
+
+
 def dbh():
     if not hasattr(flask.g, 'db'):
-        flask.g.db = MySQLdb.connect(
-            host=os.getenv('MYSQL_HOSTNAME', 'localhost'),
-            port=int(os.getenv('MYSQL_PORT', 3306)),
-            user=os.getenv('MYSQL_USER', 'isutrain'),
-            password=os.getenv('MYSQL_PASSWORD', 'isutrain'),
-            db=os.getenv('MYSQL_DATABASE', 'isutrain'),
-            charset='utf8mb4',
-            cursorclass=MySQLdb.cursors.DictCursor,
-            autocommit=True,
-        )
+        flask.g.db = cnxpool.get_connection()
     return flask.g.db
+
+
+@app.teardown_appcontext
+def teardown(error):
+    if hasattr(flask.g, "db"):
+        flask.g.db.close()
 
 
 def load_station():
     conn = dbh()
-    with conn.cursor() as c:
+    with conn.cursor(dictionary=True) as c:
         sql = "SELECT * FROM station_master"
         c.execute(sql)
         for row in c.fetchall():
             station_master[row['name']] = row
+
 
 def get_user():
     user_id = flask.session.get("user_id")
@@ -69,13 +83,13 @@ def get_user():
         raise HttpException(requests.codes['unauthorized'], "no session")
     try:
         conn = dbh()
-        with conn.cursor() as c:
+        with conn.cursor(dictionary=True) as c:
             sql = "SELECT * FROM `users` WHERE `id` = %s"
             c.execute(sql, [user_id])
             user = c.fetchone()
             if user is None:
                 raise HttpException(requests.codes['unauthorized'], "user not found")
-    except MySQLdb.Error as err:
+    except Error as err:
         app.logger.exception(err)
         raise HttpException(requests.codes['internal_server_error'], "db error")
     return user
@@ -148,6 +162,7 @@ def get_available_seats_from_train(c, train, from_station, to_station):
             available_set_map = availables[seat['seat_class']][seat['is_smoking_seat']]
             available_set_map["{}_{}_{}".format(seat["car_number"], seat["seat_row"], seat["seat_column"])] = seat
 
+        # todo: なにこのクエリ?
         sql = """SELECT sr.reservation_id, sr.car_number, sr.seat_row, sr.seat_column
         FROM seat_reservations sr, reservations r, seat_master s, station_master std, station_master sta
         WHERE
@@ -176,7 +191,7 @@ def get_available_seats_from_train(c, train, from_station, to_station):
             if key in available_set_map:
                 del (available_set_map[key])
 
-    except MySQLdb.Error as err:
+    except Error as err:
         app.logger.exception(err)
         raise HttpException(requests.codes['internal_server_error'], "db error")
 
@@ -204,7 +219,7 @@ def calc_fare(c, date, from_station, to_station, train_class, seat_class):
     distance = abs(to_station["distance"] - from_station["distance"])
     distFare = get_distance_fare(c, distance)
 
-    app.logger.warn("distFare {}".format(distFare))
+    app.logger.info("distFare {}".format(distFare))
 
     sql = "SELECT * FROM fare_master WHERE train_class=%s AND seat_class=%s ORDER BY start_date"
     c.execute(sql, (train_class, seat_class))
@@ -217,14 +232,15 @@ def calc_fare(c, date, from_station, to_station, train_class, seat_class):
 
     for fare in fareList:
         if fare["start_date"].date() <= date:
-            app.logger.warn("%s %s", fare["start_date"].date(), fare["fare_multiplier"])
+            app.logger.info("%s %s", fare["start_date"].date(), fare["fare_multiplier"])
             selectedFare = fare
 
-    app.logger.warn("%%%%%%%%%%%%%%%%%%%")
+    app.logger.info("%%%%%%%%%%%%%%%%%%%")
     return int(distFare * selectedFare["fare_multiplier"])
 
 
 def make_reservation_response(c, reservation):
+    # todo: クエリを2つまとめられそう
     sql = "SELECT departure FROM train_timetable_master WHERE date=%s AND train_class=%s AND train_name=%s AND station=%s"
     c.execute(sql, (
         reservation["date"],
@@ -278,7 +294,7 @@ def get_stations():
 
     try:
         conn = dbh()
-        with conn.cursor() as c:
+        with conn.cursor(dictionary=True) as c:
             sql = "SELECT * FROM `station_master` ORDER BY id"
             c.execute(sql)
 
@@ -294,7 +310,7 @@ def get_stations():
                 station["is_stop_local"] = True if station["is_stop_local"] else False
                 station_list.append(station)
 
-    except MySQLdb.Error as err:
+    except Error as err:
         app.logger.exception(err)
         raise HttpException(requests.codes['internal_server_error'], "db error")
 
@@ -319,7 +335,7 @@ def get_train_search():
 
     try:
         conn = dbh()
-        with conn.cursor() as c:
+        with conn.cursor(dictionary=True) as c:
             if not station_master:
                 load_station()
             from_station = station_master.get(from_name)
@@ -332,15 +348,13 @@ def get_train_search():
                 is_nobori = True
 
             usable_train_class_list = get_usable_train_class_list(from_station, to_station)
-            # app.logger.warnning("{}".format(usable_train_class_list))
+            app.logger.info("{}".format(usable_train_class_list))
 
             if is_nobori:
                 station_list = list(station_master.values())[::-1]
             else:
                 station_list = list(station_master.values())
             app.logger.debug(f"{is_nobori}, {[(s['name'], s['distance']) for s in station_list]}")
-            # app.logger.info(f"{is_nobori}, {station_list}")
-
 
             if not train_class:
                 sql = "SELECT * FROM train_master WHERE date=%s AND is_nobori=%s"
@@ -392,6 +406,7 @@ def get_train_search():
                 if isContainsOriginStation and isContainsDestStation:
                     # 列車情報
 
+                    # todo: クエリ2つまとめられそう
                     sql = "SELECT departure FROM train_timetable_master WHERE date=%s AND train_class=%s AND train_name=%s AND station=%s"
                     c.execute(sql, (str(use_at.date()), train["train_class"], train["train_name"], from_station["name"]))
                     departure = c.fetchone()
@@ -480,7 +495,7 @@ def get_train_search():
 
                     if len(trainSearchResponseList) >= 10:
                         break
-    except MySQLdb.Error as err:
+    except Error as err:
         app.logger.exception(err)
         raise HttpException(requests.codes['internal_server_error'], "db error")
 
@@ -506,21 +521,20 @@ def get_train_seats():
 
     try:
         conn = dbh()
-        with conn.cursor() as c:
+        with conn.cursor(dictionary=True) as c:
             sql = "SELECT * FROM train_master WHERE date=%s AND train_class=%s AND train_name=%s"
             c.execute(sql, (str(date), train_class, train_name))
             train = c.fetchone()
             if not train:
                 raise HttpException(requests.codes['not_found'], "列車が存在しません")
 
-            sql = "SELECT * FROM station_master WHERE name=%s"
-            c.execute(sql, (from_name,))
-            from_station = c.fetchone()
+            if not station_master:
+                load_station()
+            from_station = station_master.get(from_name)
             if not from_station:
                 raise HttpException(requests.codes['bad_request'], "fromStation: no rows")
 
-            c.execute(sql, (to_name,))
-            to_station = c.fetchone()
+            to_station = station_master.get(to_name)
             if not to_station:
                 raise HttpException(requests.codes['bad_request'], "toStation: no rows")
 
@@ -564,15 +578,15 @@ def get_train_seats():
 
                 seat_reservation_list = c.fetchall()
                 for seat_reservation in seat_reservation_list:
+                    # todo: N+1
                     sql = "SELECT * FROM reservations WHERE reservation_id=%s"
                     c.execute(sql, (seat_reservation["reservation_id"],))
                     reservation = c.fetchone()
 
-                    sql = "SELECT * FROM station_master WHERE name=%s"
-                    c.execute(sql, (reservation["departure"],))
-                    departure_station = c.fetchone()
-                    c.execute(sql, (reservation["arrival"],))
-                    arrival_station = c.fetchone()
+                    if not station_master:
+                        load_station()
+                    departure_station = station_master.get(reservation["departure"])
+                    arrival_station = station_master.get(reservation["arrival"])
 
                     if train["is_nobori"]:
                         if to_station["id"] < arrival_station["id"] and from_station["id"] <= arrival_station["id"]:
@@ -594,6 +608,8 @@ def get_train_seats():
             # 各号車の情報
             i = 1
             while True:
+                # todo: N+1
+                # todo: Cache seat_master? The table has 3942 rows
                 sql = "SELECT * FROM seat_master WHERE train_class=%s AND car_number=%s ORDER BY seat_row, seat_column LIMIT 1"
                 c.execute(sql, (train_class, i))
                 seat = c.fetchone()
@@ -607,7 +623,7 @@ def get_train_seats():
 
                 i += 1
 
-    except MySQLdb.Error as err:
+    except Error as err:
         app.logger.exception(err)
         raise HttpException(requests.codes['internal_server_error'], "db error")
 
@@ -627,7 +643,7 @@ def post_reserve():
 
     date = dateutil.parser.parse(body.get('date')).astimezone(JST).date()
 
-    app.logger.warn("%s", body)
+    app.logger.info("%s", body)
 
     train_class = body.get('train_class')
     train_name = body.get('train_name')
@@ -650,7 +666,7 @@ def post_reserve():
 
     try:
         conn = dbh()
-        with conn.cursor() as c:
+        with conn.cursor(dictionary=True) as c:
 
             sql = "SELECT * FROM train_master WHERE date=%s AND train_class=%s AND train_name=%s"
             c.execute(sql, (str(date), train_class, train_name))
@@ -658,24 +674,22 @@ def post_reserve():
             if not train:
                 raise HttpException(requests.codes['not_found'], "列車が存在しません")
 
-            sql = "SELECT * FROM station_master WHERE name=%s"
-            c.execute(sql, (train["start_station"],))
-            start_station = c.fetchone()
+            if not station_master:
+                load_station()
+
+            start_station = station_master.get(train["start_station"])
             if not start_station:
                 raise HttpException(requests.codes['not_found'], "リクエストされた列車の始発駅データがみつかりません")
 
-            c.execute(sql, (train["last_station"],))
-            last_station = c.fetchone()
+            last_station = station_master.get(train["last_station"])
             if not last_station:
                 raise HttpException(requests.codes['not_found'], "リクエストされた列車の終着駅データがみつかりません")
 
-            c.execute(sql, (departure_name,))
-            from_station = c.fetchone()
+            from_station = station_master.get(departure_name)
             if not from_station:
                 raise HttpException(requests.codes['not_found'], "リクエストされた乗車駅データがみつかりません")
 
-            c.execute(sql, (arrival_name,))
-            to_station = c.fetchone()
+            to_station = station_master.get(arrival_name)
             if not to_station:
                 raise HttpException(requests.codes['not_found'], "リクエストされた降車駅データがみつかりません")
 
@@ -707,6 +721,7 @@ def post_reserve():
                     seats = []  # 予約対象席を空っぽに
 
                     for seat in seat_list:
+                        # todo: N+1
                         sql = "SELECT s.* FROM seat_reservations s, reservations r WHERE r.date=%s AND r.train_class=%s AND r.train_name=%s AND car_number=%s AND seat_row=%s AND seat_column=%s FOR UPDATE"
                         c.execute(sql, (str(date), train_class, train_name, seat["car_number"], seat["seat_row"], seat["seat_column"]))
                         seat_reservation_list = c.fetchall()
@@ -714,17 +729,18 @@ def post_reserve():
                         is_occupied = False
 
                         for seat_reservation in seat_reservation_list:
+                            # todo: N+1
                             sql = "SELECT * FROM reservations WHERE reservation_id=%s FOR UPDATE"
                             c.execute(sql, (seat_reservation["reservation_id"],))
                             reservation = c.fetchone()
                             if not reservation:
                                 raise HttpException(requests.codes['bad_request'], "reservationが見つかりません")
 
-                            sql = "SELECT * FROM station_master WHERE name=%s"
-                            c.execute(sql, (reservation["departure"],))
-                            departure_station = c.fetchone()
-                            c.execute(sql, (reservation["arrival"],))
-                            arrival_station = c.fetchone()
+                            if not station_master:
+                                load_station()
+
+                            departure_station = station_master.get(reservation["departure"])
+                            arrival_station = station_master.get(reservation["arrival"])
 
                             if train["is_nobori"]:
                                 if to_station["id"] < arrival_station["id"] and from_station["id"] <= arrival_station["id"]:
@@ -785,15 +801,15 @@ def post_reserve():
                     if len(seats) < (adult + child):
                         # リクエストに対して席数が足りてない
                         # 次の号車にうつしたい
-                        app.logger.warn("-----------------")
-                        app.logger.warn("現在検索中の車両: %d号車, リクエスト座席数: %d, 予約できそうな座席数: %d, 不足数: %d", car_number, adult + child, len(seats), adult + child - len(seats))
-                        app.logger.warn("リクエストに対して座席数が不足しているため、次の車両を検索します。")
+                        app.logger.info("-----------------")
+                        app.logger.info("現在検索中の車両: %d号車, リクエスト座席数: %d, 予約できそうな座席数: %d, 不足数: %d", car_number, adult + child, len(seats), adult + child - len(seats))
+                        app.logger.info("リクエストに対して座席数が不足しているため、次の車両を検索します。")
                         if car_number == 16:
-                            app.logger.warn("この新幹線にまとめて予約できる席数がなかったから検索をやめるよ")
+                            app.logger.info("この新幹線にまとめて予約できる席数がなかったから検索をやめるよ")
                             raise HttpException(requests.codes['not_found'], "あいまい座席予約ができませんでした。指定した席、もしくは1車両内に希望の席数をご用意できませんでした。")
 
                     else:
-                        app.logger.warn("空き実績: %d号車 シート:%s 席数:%d", car_number, seats, len(seats))
+                        app.logger.info("空き実績: %d号車 シート:%s 席数:%d", car_number, seats, len(seats))
                         seats = seats[:adult + child]
                         break
 
@@ -818,14 +834,14 @@ def post_reserve():
                     continue
 
                 # 予約情報の乗車区間の駅IDを求める
-                sql = "SELECT * FROM station_master WHERE name=%s"
-                c.execute(sql, (reservation["departure"],))
-                reservedfromStation = c.fetchone()
+                if not station_master:
+                    load_station()
+
+                reservedfromStation = station_master.get(reservation["departure"])
                 if not reservedfromStation:
                     raise HttpException(requests.codes['internal_server_error'], "予約情報に記載された列車の乗車駅データがみつかりません")
 
-                c.execute(sql, (reservation["arrival"],))
-                reservedtoStation = c.fetchone()
+                reservedtoStation = station_master.get(reservation["arrival"])
                 if not reservedtoStation:
                     raise HttpException(requests.codes['internal_server_error'], "予約情報に記載された列車の降車駅データがみつかりません")
 
@@ -856,7 +872,7 @@ def post_reserve():
                     for v in seat_reservations:
                         for seat in seats:
                             if v["car_number"] == car_number and v["seat_row"] == seat["row"] and v["seat_column"] == seat["column"]:
-                                app.logger.warn("Duplicated ", reservation)
+                                app.logger.info("Duplicated ", reservation)
                                 raise HttpException(requests.codes['bad_request'], "リクエストに既に予約された席が含まれています")
 
             # 3段階の予約前チェック終わり
@@ -874,7 +890,7 @@ def post_reserve():
             fare = calc_fare(c, date, from_station, to_station, train_class, seat_class)
 
             sumFare = int(adult * fare) + int(child * fare / 2)
-            app.logger.warn("SUMFARE %d", sumFare)
+            app.logger.info("SUMFARE %d", sumFare)
 
             # userID取得。ログインしてないと怒られる。
             user = get_user()
@@ -905,7 +921,7 @@ def post_reserve():
             for seat in seats:
                 c.execute(sql, (reservation_id, car_number, seat["row"], seat["column"]))
 
-    except MySQLdb.Error as err:
+    except Error as err:
         conn.rollback()
         app.logger.exception(err)
         raise HttpException(requests.codes['internal_server_error'], "db error")
@@ -922,22 +938,16 @@ def post_reserve():
 
 @app.route("/api/train/reservation/commit", methods=["POST"])
 def post_commit():
-    app.logger.warn("XXXXX1 %s", flask.request)
-    app.logger.warn("XXXXX2 %s", flask.request.form)
-    app.logger.warn("XXXXX3 %s", flask.request.json)
     body = flask.request.json
-    app.logger.warn("XXXX %s", body)
 
     reservation_id = body.get('reservation_id')
     card_token = body.get('card_token')
 
     user = get_user()
 
-    app.logger.warn("/api/train/reservation/commit")
-
     try:
         conn = dbh()
-        with conn.cursor() as c:
+        with conn.cursor(dictionary=True) as c:
             # 予約IDで検索
             sql = "SELECT * FROM reservations WHERE reservation_id=%s"
             c.execute(sql, (reservation_id,))
@@ -970,7 +980,7 @@ def post_commit():
             sql = "UPDATE reservations SET status=%s, payment_id=%s WHERE reservation_id=%s"
             c.execute(sql, ("done", payment_res["payment_id"], reservation["reservation_id"]))
 
-    except MySQLdb.Error as err:
+    except Error as err:
         conn.rollback()
         app.logger.exception(err)
         raise HttpException(requests.codes['internal_server_error'], "db error")
@@ -993,15 +1003,16 @@ def get_auth():
 def post_signup():
     email = flask.request.json['email']
     password = flask.request.json['password']
+    # todo: たぶん遅い
     super_secure_password = pbkdf2.crypt(password, iterations=100)
 
     try:
         conn = dbh()
-        with conn.cursor() as c:
+        with conn.cursor(dictionary=True) as c:
             sql = "INSERT INTO `users` (`email`, `salt`, `super_secure_password`) VALUES (%s, %s, %s)"
             c.execute(sql, (email, "", super_secure_password))
 
-    except MySQLdb.Error as err:
+    except Error as err:
         app.logger.exception(err)
         raise HttpException(requests.codes['internal_server_error'], "db error")
 
@@ -1015,19 +1026,19 @@ def post_login():
 
     try:
         conn = dbh()
-        with conn.cursor() as c:
+        with conn.cursor(dictionary=True) as c:
             sql = "SELECT * FROM users WHERE email=%s"
             c.execute(sql, (email,))
             user = c.fetchone()
             if not user:
                 raise HttpException(requests.codes['forbidden'], "authentication failed")
 
-            if pbkdf2.crypt(password, user["super_secure_password"]) != user["super_secure_password"].decode("ascii"):
+            if pbkdf2.crypt(password, user["super_secure_password"]) != user["super_secure_password"]:
                 raise HttpException(requests.codes['forbidden'], "authentication failed")
 
             flask.session['user_id'] = user["id"]
 
-    except MySQLdb.Error as err:
+    except Error as err:
         app.logger.exception(err)
         raise HttpException(requests.codes['internal_server_error'], "db error")
 
@@ -1048,7 +1059,7 @@ def get_user_reservations():
     ret = []
     try:
         conn = dbh()
-        with conn.cursor() as c:
+        with conn.cursor(dictionary=True) as c:
             sql = "SELECT * FROM reservations WHERE user_id=%s"
             c.execute(sql, (user["id"],))
             reservations = c.fetchall()
@@ -1056,7 +1067,7 @@ def get_user_reservations():
             for reservation in reservations:
                 ret.append(make_reservation_response(c, reservation))
 
-    except MySQLdb.Error as err:
+    except Error as err:
         app.logger.exception(err)
         raise HttpException(requests.codes['internal_server_error'], "db error")
 
@@ -1070,7 +1081,7 @@ def get_user_reservation_detail(item_id):
     reservation = None
     try:
         conn = dbh()
-        with conn.cursor() as c:
+        with conn.cursor(dictionary=True) as c:
             sql = "SELECT * FROM reservations WHERE user_id=%s AND reservation_id=%s"
             c.execute(sql, (user["id"], item_id))
             reservation = c.fetchone()
@@ -1079,7 +1090,7 @@ def get_user_reservation_detail(item_id):
 
             reservation = make_reservation_response(c, reservation)
 
-    except MySQLdb.Error as err:
+    except Error as err:
         app.logger.exception(err)
         raise HttpException(requests.codes['internal_server_error'], "db error")
 
@@ -1093,7 +1104,7 @@ def post_user_reservation_cancel(item_id):
     reservation = None
     try:
         conn = dbh()
-        with conn.cursor() as c:
+        with conn.cursor(dictionary=True) as c:
             sql = "SELECT * FROM reservations WHERE user_id=%s AND reservation_id=%s"
             c.execute(sql, (user["id"], item_id))
             reservation = c.fetchone()
@@ -1117,7 +1128,7 @@ def post_user_reservation_cancel(item_id):
 
             sql = "DELETE FROM seat_reservations WHERE reservation_id=%s"
             c.execute(sql, (reservation["reservation_id"],))
-    except MySQLdb.Error as err:
+    except Error as err:
         conn.rollback()
         app.logger.exception(err)
         raise HttpException(requests.codes['internal_server_error'], "db error")
@@ -1139,7 +1150,7 @@ def get_settings():
 def post_initialize():
     app.logger.info('INITIALIZE!!!')
     conn = dbh()
-    with conn.cursor() as c:
+    with conn.cursor(dictionary=True) as c:
         c.execute("TRUNCATE seat_reservations")
         c.execute("TRUNCATE reservations")
         c.execute("TRUNCATE users")

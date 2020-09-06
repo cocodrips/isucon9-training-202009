@@ -1,0 +1,25 @@
+- git:
+    repo: 'git@github.com:cocodrips/isucon9-training-202009.git'
+    dest: /home/isucon/isucon9-final
+    update: yes
+    version: master
+    accept_hostkey: yes
+    force: yes
+  become_user: isucon
+  become: false
+
+- copy:
+    src: ../files/.env
+    dest: /home/isucon/isucon9-final/webapp
+  become_user: isucon
+
+- name: Install pip
+  apt:
+    name: python-pip
+    state: present
+
+- name: install docker lib for python
+  pip:
+    name:
+     - docker
+     - docker-compose

@@ -17,3 +17,10 @@ create index fare_master_train_class_seat_class_index
 	on fare_master (train_class, seat_class);
 create index seat_reservations_reservation_id_index
 	on seat_reservations (reservation_id);
+
+create index train_master_date_is_nobori_train_class_index
+	on train_master (date, is_nobori, train_class);
+create index train_master_date_train_class_train_name_index
+	on train_master (date, train_class, train_name);
+create index train_master_is_nobori_date_index
+	on train_master (is_nobori, date);
